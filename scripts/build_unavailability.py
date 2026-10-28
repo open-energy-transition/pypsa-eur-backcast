@@ -48,11 +48,13 @@ if __name__ == "__main__":
     area_to_bus = read_area_to_bus(snakemake.input.area_to_bus)
     steps = pd.concat(
         [
-            pd.read_csv(fn, parse_dates=["start", "end"]).assign(area=area)
+            pd.read_csv(fn).assign(area=area)
             for area in snakemake.params.areas
             for fn in snakemake.input[area]
         ]
     )
+    # parsed after concatenating, since areas without outages have empty columns
+    steps[["start", "end"]] = steps[["start", "end"]].apply(pd.to_datetime, utc=True)
     steps = latest_outages(steps)
     unavailable = hourly_unavailable(steps, snapshots)
 
