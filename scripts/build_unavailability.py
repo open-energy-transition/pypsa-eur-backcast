@@ -7,8 +7,8 @@ Builds the hourly unavailable share of the thermal capacity per bus and carrier 
 Of each outage, the latest revision is kept unless it is cancelled or
 withdrawn. Generation unit outages take precedence over production unit
 outages of the same production unit. The production units are matched to the
-power plants of [build_powerplants][] by their EIC code, else by name and
-capacity within the ENTSO-E area and fuel type. The hourly unavailable
+power plants of [build_powerplants][] by their EIC code, nuclear units without
+one by name and capacity within the ENTSO-E area. The hourly unavailable
 capacity of the matched plants is summed per bus and carrier and divided by
 the capacity of all plants of the bus and carrier, including plants without
 outage data. The second output holds the capacity, the capacity matched to

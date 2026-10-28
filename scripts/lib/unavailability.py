@@ -19,18 +19,17 @@ from scripts.lib.entsoe import assert_known_areas
 logger = logging.getLogger(__name__)
 
 # ENTSO-E production types matched by name to the powerplantmatching fuel types
-# (lower case, as in the PyPSA column names) of plants without an EIC code.
-PLANT_TYPE_FUELTYPES = {
-    "Fossil Gas": ["natural gas", "CCGT", "OCGT"],
-    "Fossil Hard coal": ["coal"],
-    "Fossil Coal-derived gas": ["coal"],
-    "Fossil Brown coal/Lignite": ["lignite"],
-    "Fossil Oil shale": ["lignite"],
-    "Fossil Peat": ["lignite"],
-    "Fossil Oil": ["oil"],
-    "Nuclear": ["nuclear"],
-}
+# (lower case, as in the PyPSA column names) of plants without an EIC code. Only
+# nuclear units are few, large and distinctively named enough, names of e.g. gas
+# CHP plants like "HKW Mitte" are ambiguous.
+NAME_MATCH_FUELTYPES = {"Nuclear": ["nuclear"]}
 INACTIVE_STATUS = ["Cancelled", "Withdrawn"]
+# Words of plant names that do not identify a plant.
+GENERIC_WORDS = {
+    "ag", "block", "ccgt", "central", "centrale", "chp", "energie", "energy",
+    "gmbh", "gt", "gud", "heizkraftwerk", "hkw", "kernkraftwerk", "kkw",
+    "kraftwerk", "kw", "ocgt", "plant", "power", "spa", "station", "unit",
+}  # fmt: skip
 
 
 def latest_outages(steps: pd.DataFrame) -> pd.DataFrame:
@@ -121,18 +120,27 @@ def entsoe_codes(ppl: pd.DataFrame) -> pd.Series:
 
 
 def name_tokens(name: str) -> set[str]:
-    """Lower case words and numbers of a plant name without accents."""
+    """Lower case words and numbers of a plant name without accents and generic words."""
     ascii_name = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore")
-    return set(re.findall(r"[a-z]+|\d+", ascii_name.decode().lower()))
+    return set(re.findall(r"[a-z]+|\d+", ascii_name.decode().lower())) - GENERIC_WORDS
+
+
+def is_distinctive(token: str) -> bool:
+    """Whether a name token is a word of at least three letters, not a unit number or letter."""
+    return token.isalpha() and len(token) >= 3
 
 
 def name_score(names: list[str], candidate: str) -> float:
-    """Share of the words of the shorter name found in the other, the best over `names`."""
+    """
+    Share of the words of the shorter name found in the other, the best over `names`.
+
+    Names without a shared distinctive word score zero, e.g. names sharing only a unit number.
+    """
     other = name_tokens(candidate)
     scores = [
         len(tokens & other) / min(len(tokens), len(other))
         for tokens in map(name_tokens, names)
-        if tokens and other
+        if any(map(is_distinctive, tokens & other))
     ]
     return max(scores, default=0.0)
 
@@ -148,7 +156,7 @@ def match_production_units(
 
     Production units are matched by their EIC code to the ENTSO-E project IDs
     of powerplantmatching. Unmatched production units of the production types
-    in ``PLANT_TYPE_FUELTYPES`` are matched to the plant of the same area and
+    in ``NAME_MATCH_FUELTYPES`` are matched to the plant of the same area and
     fuel type without EIC match with the best name score of at least
     `min_name_score` and a capacity within `capacity_tolerance` of the
     production unit, with the closest capacity breaking ties.
@@ -173,7 +181,7 @@ def match_production_units(
     candidates = ppl.drop(by_code.unique())
     matches = [by_code]
     for code, unit in units.drop(by_code.index.unique()).iterrows():
-        fueltypes = PLANT_TYPE_FUELTYPES.get(unit.plant_type)
+        fueltypes = NAME_MATCH_FUELTYPES.get(unit.plant_type)
         if not fueltypes:
             continue
         pool = candidates.query("area == @unit.area and carrier in @fueltypes")

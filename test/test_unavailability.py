@@ -14,6 +14,7 @@ from scripts.lib.unavailability import (
     hourly_unavailable,
     latest_outages,
     match_production_units,
+    name_score,
     production_units,
     unavailable_share,
 )
@@ -200,6 +201,23 @@ def test_match_production_units_by_code_and_name(ppl):
 )
 def test_match_production_units_rejects_capacity_area_fuel_and_name(ppl, unit):
     assert match_production_units(units(X1=unit), ppl).empty
+
+
+@pytest.mark.parametrize(
+    "names, candidate, score",
+    [
+        (
+            ["Kernkraftwerk Neckarwestheim", "KKW Neckarwestheim 2"],
+            "Neckarwestheim 2 Gkn 2",
+            1.0,
+        ),
+        (["HKW Mitte"], "Berlin Mitte", 1.0),
+        (["HKW Merkenich"], "Gud", 0.0),
+        (["GuD Ludwigshafen Mitte", "GT 2"], "Gt 2", 0.0),
+    ],
+)
+def test_name_score_ignores_generic_words_and_unit_numbers(names, candidate, score):
+    assert name_score(names, candidate) == score
 
 
 def test_unavailable_share_splits_clips_and_covers(ppl):
