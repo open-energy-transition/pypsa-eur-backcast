@@ -603,7 +603,6 @@ backcast:
     - coal
     - lignite
     - oil
-    - nuclear
     min_coverage:
       nuclear: 0.9
 

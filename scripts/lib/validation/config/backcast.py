@@ -68,8 +68,8 @@ class UnavailabilityConfig(ConfigModel):
         description="Set the availability (`p_max_pu`) of the generators of the `carriers` per bus to one minus the hourly unavailable share of their capacity from the unavailability of generation and production units published on the ENTSO-E Transparency Platform (planned and forced outages). The production units are matched to powerplantmatching by EIC code, nuclear units without one by name and capacity. The availability replaces `monthly_nuclear_availability` in areas with enough nuclear outage data (`min_coverage`). Nuclear generators of areas in `nuclear_phase_out` get zero availability after their last operating date. Requires `foresight: overnight`.",
     )
     carriers: list[str] = Field(
-        default_factory=lambda: ["CCGT", "OCGT", "coal", "lignite", "oil", "nuclear"],
-        description="Generator carriers whose availability is set from the outage data.",
+        default_factory=lambda: ["CCGT", "OCGT", "coal", "lignite", "oil"],
+        description="Generator carriers whose availability is set from the outage data. Nuclear is left out by default, since outages miss units closed during the year, capacity without reported outages and modulation, so its availability is overstated.",
     )
     min_coverage: dict[str, Annotated[float, Field(ge=0, le=1)]] = Field(
         default_factory=lambda: {"nuclear": 0.9},

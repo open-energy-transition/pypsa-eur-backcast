@@ -155,6 +155,8 @@ backcast:
   monthly_nuclear_availability: true
   nuclear_phase_out:
     DE_LU: "2023-04-15"
+  unavailability:
+    enable: true
   hybrid_capacities:
     enable: true
     physical_factor: 0.49

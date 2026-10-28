@@ -602,7 +602,7 @@
               "type": "boolean"
             },
             "carriers": {
-              "description": "Generator carriers whose availability is set from the outage data.",
+              "description": "Generator carriers whose availability is set from the outage data. Nuclear is left out by default, since outages miss units closed during the year, capacity without reported outages and modulation, so its availability is overstated.",
               "items": {
                 "type": "string"
               },
@@ -7007,7 +7007,7 @@
           "type": "boolean"
         },
         "carriers": {
-          "description": "Generator carriers whose availability is set from the outage data.",
+          "description": "Generator carriers whose availability is set from the outage data. Nuclear is left out by default, since outages miss units closed during the year, capacity without reported outages and modulation, so its availability is overstated.",
           "items": {
             "type": "string"
           },
@@ -13062,7 +13062,7 @@
               "type": "boolean"
             },
             "carriers": {
-              "description": "Generator carriers whose availability is set from the outage data.",
+              "description": "Generator carriers whose availability is set from the outage data. Nuclear is left out by default, since outages miss units closed during the year, capacity without reported outages and modulation, so its availability is overstated.",
               "items": {
                 "type": "string"
               },
