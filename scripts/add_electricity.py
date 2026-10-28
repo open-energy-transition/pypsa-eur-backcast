@@ -657,10 +657,14 @@ def attach_conventional_generators(
         if gas_price is not None:
             daily = conventional_params["daily_gas_price"]
             gas = ppl.index[ppl.carrier.isin(["CCGT", "OCGT"])]
-            hub = countries[gas].map(daily["hubs"]).fillna(daily["default_hub"])
-            fuel_price[gas] = gas_price[hub].to_numpy()
+            hub = countries[gas].map(daily["hubs"])
+            if daily["default_hub"] is not None:
+                hub = hub.fillna(daily["default_hub"])
+            # Without a default hub, generators outside `hubs` keep the monthly price.
+            hub = hub.dropna()
+            fuel_price[hub.index] = gas_price[hub].to_numpy()
             logger.info(
-                f"Set the daily gas price of {len(gas)} generators from the hubs "
+                f"Set the daily gas price of {len(hub)} of {len(gas)} gas generators from the hubs "
                 f"{hub.value_counts().to_dict()}."
             )
         gas_cap = conventional_params["gas_price_cap"]

@@ -132,9 +132,9 @@ class _DailyGasPriceConfig(BaseModel):
         False,
         description="Replace the monthly World Bank gas price of the CCGT and OCGT generators by the daily price of their gas hub. Each gas day applies from 06:00 CET. Oil and coal keep the monthly prices. Requires `dynamic_fuel_price` and `fuel_price_nominal`.",
     )
-    default_hub: Literal["THE", "MIBGAS"] = Field(
+    default_hub: Literal["THE", "MIBGAS"] | None = Field(
         "THE",
-        description="Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT).",
+        description="Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT). With `null`, countries not in `hubs` keep the monthly price.",
     )
     hubs: dict[str, Literal["THE", "MIBGAS"]] = Field(
         default_factory=dict,

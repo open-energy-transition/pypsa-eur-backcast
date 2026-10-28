@@ -212,7 +212,12 @@ def test_conventional_config_accepts_gas_price_cap():
     assert config.gas_price_cap.cap == CAP
 
 
-def test_daily_gas_price_per_hub_before_cap():
+@pytest.mark.parametrize(
+    ("default_hub", "fr_cost"),
+    [("THE", [80.0, 90.0, 100.0]), (None, 120.0)],
+    ids=["default-hub", "monthly-fallback"],
+)
+def test_daily_gas_price_per_hub_before_cap(default_hub, fr_cost):
     n = pypsa.Network()
     n.set_snapshots(DAYS)
     n.add("Bus", ["ES00", "FR00"], country=["ES", "FR"])
@@ -238,7 +243,7 @@ def test_daily_gas_price_per_hub_before_cap():
     )
     conventional = {
         "gas_price_cap": {"enable": True, "countries": ["ES"], "cap": CAP},
-        "daily_gas_price": {"default_hub": "THE", "hubs": {"ES": "MIBGAS"}},
+        "daily_gas_price": {"default_hub": default_hub, "hubs": {"ES": "MIBGAS"}},
     }
     attach_conventional_generators(
         n,
@@ -254,7 +259,7 @@ def test_daily_gas_price_per_hub_before_cap():
     )
     marginal_cost = n.generators_t.marginal_cost
     np.testing.assert_allclose(marginal_cost["ES CCGT"], [110.0, 100.0, 140.0])
-    np.testing.assert_allclose(marginal_cost["FR CCGT"], [80.0, 90.0, 100.0])
+    np.testing.assert_allclose(marginal_cost["FR CCGT"], fr_cost)
     np.testing.assert_allclose(marginal_cost["ES coal"], 120.0)
 
 
@@ -278,3 +283,8 @@ def test_conventional_config_accepts_daily_gas_price():
         dynamic_fuel_price=True, fuel_price_nominal=True, daily_gas_price=daily
     )
     assert config.daily_gas_price.default_hub == "THE"
+    daily["default_hub"] = None
+    config = ConventionalConfig(
+        dynamic_fuel_price=True, fuel_price_nominal=True, daily_gas_price=daily
+    )
+    assert config.daily_gas_price.default_hub is None

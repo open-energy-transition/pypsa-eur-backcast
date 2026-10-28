@@ -61,6 +61,13 @@ conventional:
     utilisation: 0.35
     reference: observed
     exclude_areas: [IE_SEM]
+  # THE daily prices start in 2021-10, so other countries keep the monthly price.
+  daily_gas_price:
+    enable: true
+    default_hub:
+    hubs:
+      ES: MIBGAS
+      PT: MIBGAS
 
 costs:
   year: 2020

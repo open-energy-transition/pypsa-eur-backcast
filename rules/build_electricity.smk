@@ -460,7 +460,7 @@ rule build_fossil_fuel_prices:
 
 def input_daily_gas_prices(w) -> dict[str, list[str]]:
     cfg = config_provider("conventional", "daily_gas_price")(w)
-    hubs = {cfg["default_hub"], *cfg["hubs"].values()}
+    hubs = {cfg["default_hub"], *cfg["hubs"].values()} - {None}
     files = {
         "THE": f"{THE_GAS_PRICES_DATASET['folder']}/PricesEnergyImbalance_{{year}}.xml",
         "MIBGAS": f"{MIBGAS_GAS_PRICES_DATASET['folder']}/MIBGAS_Data_{{year}}.xlsx",

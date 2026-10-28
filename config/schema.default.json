@@ -1098,13 +1098,20 @@
               "type": "boolean"
             },
             "default_hub": {
-              "default": "THE",
-              "description": "Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT).",
-              "enum": [
-                "THE",
-                "MIBGAS"
+              "anyOf": [
+                {
+                  "enum": [
+                    "THE",
+                    "MIBGAS"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
-              "type": "string"
+              "default": "THE",
+              "description": "Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT). With `null`, countries not in `hubs` keep the monthly price."
             },
             "hubs": {
               "additionalProperties": {
@@ -8062,13 +8069,20 @@
           "type": "boolean"
         },
         "default_hub": {
-          "default": "THE",
-          "description": "Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT).",
-          "enum": [
-            "THE",
-            "MIBGAS"
+          "anyOf": [
+            {
+              "enum": [
+                "THE",
+                "MIBGAS"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "type": "string"
+          "default": "THE",
+          "description": "Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT). With `null`, countries not in `hubs` keep the monthly price."
         },
         "hubs": {
           "additionalProperties": {
@@ -12543,13 +12557,20 @@
               "type": "boolean"
             },
             "default_hub": {
-              "default": "THE",
-              "description": "Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT).",
-              "enum": [
-                "THE",
-                "MIBGAS"
+              "anyOf": [
+                {
+                  "enum": [
+                    "THE",
+                    "MIBGAS"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
-              "type": "string"
+              "default": "THE",
+              "description": "Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT). With `null`, countries not in `hubs` keep the monthly price."
             },
             "hubs": {
               "additionalProperties": {
