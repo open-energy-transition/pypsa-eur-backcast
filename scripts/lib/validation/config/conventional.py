@@ -125,6 +125,23 @@ class _GasPriceCapConfig(BaseModel):
         return self
 
 
+class _DailyGasPriceConfig(BaseModel):
+    """Configuration for `conventional.daily_gas_price` settings."""
+
+    enable: bool = Field(
+        False,
+        description="Replace the monthly World Bank gas price of the CCGT and OCGT generators by the daily price of their gas hub. Each gas day applies from 06:00 CET. Oil and coal keep the monthly prices. Requires `dynamic_fuel_price` and `fuel_price_nominal`.",
+    )
+    default_hub: Literal["THE", "MIBGAS"] = Field(
+        "THE",
+        description="Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT).",
+    )
+    hubs: dict[str, Literal["THE", "MIBGAS"]] = Field(
+        default_factory=dict,
+        description="Gas hub per country, e.g. `{ES: MIBGAS, PT: MIBGAS}`.",
+    )
+
+
 class ConventionalConfig(ConfigModel):
     """Configuration for `conventional` settings."""
 
@@ -141,6 +158,10 @@ class ConventionalConfig(ConfigModel):
     gas_price_cap: _GasPriceCapConfig = Field(
         default_factory=_GasPriceCapConfig,
         description="Cap of the gas price of gas-fired generators per country and period.",
+    )
+    daily_gas_price: _DailyGasPriceConfig = Field(
+        default_factory=_DailyGasPriceConfig,
+        description="Daily gas prices per hub instead of the monthly World Bank gas price.",
     )
     unit_commitment: bool = Field(
         False,
@@ -169,5 +190,15 @@ class ConventionalConfig(ConfigModel):
         """Require dynamic fuel prices for the gas price cap."""
         assert self.dynamic_fuel_price or not self.gas_price_cap.enable, (
             "conventional: gas_price_cap requires dynamic_fuel_price."
+        )
+        return self
+
+    @model_validator(mode="after")
+    def check_daily_gas_price_nominal(self) -> "ConventionalConfig":
+        """Require nominal monthly fuel prices for the nominal daily gas prices."""
+        assert not self.daily_gas_price.enable or (
+            self.dynamic_fuel_price and self.fuel_price_nominal
+        ), (
+            "conventional: daily_gas_price requires dynamic_fuel_price and fuel_price_nominal."
         )
         return self

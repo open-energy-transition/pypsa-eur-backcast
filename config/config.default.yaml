@@ -472,6 +472,10 @@ conventional:
     enable: false
     countries: []
     cap: {}
+  daily_gas_price:
+    enable: false
+    default_hub: THE
+    hubs: {}
   unit_commitment: false
   dynamic_fuel_price: false
   fuel_price_rolling_window: 6
@@ -1494,6 +1498,12 @@ data:
     source: archive
     version: latest
   instrat_co2_prices:
+    source: primary
+    version: latest
+  the_gas_prices:
+    source: primary
+    version: latest
+  mibgas_gas_prices:
     source: primary
     version: latest
   co2stop:

@@ -94,6 +94,7 @@ lau_regions,2019,primary,latest supported,2025-12-02,,https://gisco-services.ec.
 lau_regions,2019,archive,latest supported,2026-01-13,,https://data.pypsa.org/workflows/eur/lau_regions/2019/ref-lau-2019-01m.geojson.zip
 luisa_land_cover,unknown,primary,latest supported,2025-12-02,,https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/LUISA/EUROPE/Basemaps/LandUse/2018/LATEST/LUISA_basemap_020321_50m.tif
 luisa_land_cover,2021-03-02,archive,latest supported,2026-01-13,,https://data.pypsa.org/workflows/eur/luisa_land_cover/2021-03-02/LUISA_basemap_020321_50m.tif
+mibgas_gas_prices,unknown,primary,latest supported,2026-10-28,"Annual MIBGAS data files, free use with attribution to MIBGAS. {year} is replaced inside retrieve.smk.",https://www.mibgas.es/en/file-access/MIBGAS_Data_{year}.xlsx?path=AGNO_{year}/XLS
 mobility_profiles,unknown,build,latest supported,2025-12-02,"Latest dataset built using BASt vehicle monitoring data. The URL is a template that is filled based on the config file, see the documentation for details.",https://www.bast.de/videos/{year}_{street_type}_S.zip
 mobility_profiles,2025-08-27,primary,latest supported,2025-12-02,New version recreating the dataset from the data bundle.,https://zenodo.org/records/16965042/files
 mobility_profiles,2025-08-27,archive,latest supported,2026-01-13,New version recreating the dataset from the data bundle.,https://data.pypsa.org/workflows/eur/mobility_profiles/2025-08-27
@@ -158,6 +159,7 @@ synthetic_electricity_demand,v2,archive,latest supported,2026-01-20,the primary 
 synthetic_electricity_demand,0.1.0,archive,deprecated might-work,2026-01-13,,https://data.pypsa.org/workflows/eur/synthetic_electricity_demand/0.1.0/demand_hourly.csv
 tabula_calculator,unknown,primary,latest supported,2026-09-02,Derived from the Calc.Set.Building sheet of the TABULA calculator workbook,https://episcope.eu/fileadmin/tabula/public/calc/tabula-calculator.xlsx
 tabula_calculator,2026-09-07,archive,latest supported,2026-09-07,Derived from the Calc.Set.Building sheet of the TABULA calculator workbook,https://data.pypsa.org/workflows/eur/tabula_calculator/2026-09-07/tabula-calculator.xlsx
+the_gas_prices,unknown,primary,latest supported,2026-10-28,"Trading Hub Europe DataExport API without versioning, from gas day 2021-10-01. The THE terms require consent for copying, so there is no archive.",https://api.tradinghub.eu/api/dataexport/xmlexport/PricesEnergyImbalance
 tyndp,2024,primary,latest supported,2025-12-02,,https://2024-data.entsos-tyndp-scenarios.eu/files/scenarios-inputs
 tyndp,2024,archive,latest supported,2026-01-13,,https://data.pypsa.org/workflows/eur/tyndp/2024
 wdpa,unknown,primary,latest supported,2025-12-02,"WDPA changes its URL every month, the URL here is used as a template and {bYYYY} is replaced inside the retrieve.smk.",https://d1gam3xoknrgr2.cloudfront.net/current/WDPA_{bYYYY}_Public_shp.zip

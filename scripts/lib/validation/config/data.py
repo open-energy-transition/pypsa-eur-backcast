@@ -201,6 +201,14 @@ class DataConfig(BaseModel):
         default_factory=lambda: _DataSourceConfig(source="primary"),
         description="Instrat CO2 prices data source configuration.",
     )
+    the_gas_prices: _DataSourceConfig = Field(
+        default_factory=lambda: _DataSourceConfig(source="primary"),
+        description="Trading Hub Europe (THE) daily gas prices data source configuration.",
+    )
+    mibgas_gas_prices: _DataSourceConfig = Field(
+        default_factory=lambda: _DataSourceConfig(source="primary"),
+        description="MIBGAS daily gas prices data source configuration.",
+    )
     co2stop: _DataSourceConfig = Field(
         default_factory=_DataSourceConfig,
         description="CO2Stop data source configuration.",

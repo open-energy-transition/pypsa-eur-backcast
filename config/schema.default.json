@@ -1089,6 +1089,36 @@
             }
           }
         },
+        "daily_gas_price": {
+          "description": "Configuration for `conventional.daily_gas_price` settings.",
+          "properties": {
+            "enable": {
+              "default": false,
+              "description": "Replace the monthly World Bank gas price of the CCGT and OCGT generators by the daily price of their gas hub. Each gas day applies from 06:00 CET. Oil and coal keep the monthly prices. Requires `dynamic_fuel_price` and `fuel_price_nominal`.",
+              "type": "boolean"
+            },
+            "default_hub": {
+              "default": "THE",
+              "description": "Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT).",
+              "enum": [
+                "THE",
+                "MIBGAS"
+              ],
+              "type": "string"
+            },
+            "hubs": {
+              "additionalProperties": {
+                "enum": [
+                  "THE",
+                  "MIBGAS"
+                ],
+                "type": "string"
+              },
+              "description": "Gas hub per country, e.g. `{ES: MIBGAS, PT: MIBGAS}`.",
+              "type": "object"
+            }
+          }
+        },
         "unit_commitment": {
           "default": false,
           "description": "Allow the overwrite of ramp_limit_up, ramp_limit_start_up, ramp_limit_shut_down, p_min_pu, min_up_time, min_down_time, and start_up_cost of conventional generators. Refer to the CSV file 'unit_commitment.csv'.",
@@ -1464,6 +1494,46 @@
           }
         },
         "instrat_co2_prices": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "the_gas_prices": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "mibgas_gas_prices": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {
@@ -7983,6 +8053,36 @@
         }
       }
     },
+    "_DailyGasPriceConfig": {
+      "description": "Configuration for `conventional.daily_gas_price` settings.",
+      "properties": {
+        "enable": {
+          "default": false,
+          "description": "Replace the monthly World Bank gas price of the CCGT and OCGT generators by the daily price of their gas hub. Each gas day applies from 06:00 CET. Oil and coal keep the monthly prices. Requires `dynamic_fuel_price` and `fuel_price_nominal`.",
+          "type": "boolean"
+        },
+        "default_hub": {
+          "default": "THE",
+          "description": "Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT).",
+          "enum": [
+            "THE",
+            "MIBGAS"
+          ],
+          "type": "string"
+        },
+        "hubs": {
+          "additionalProperties": {
+            "enum": [
+              "THE",
+              "MIBGAS"
+            ],
+            "type": "string"
+          },
+          "description": "Gas hub per country, e.g. `{ES: MIBGAS, PT: MIBGAS}`.",
+          "type": "object"
+        }
+      }
+    },
     "_DataSourceConfig": {
       "description": "Configuration for a single data source.",
       "properties": {
@@ -12434,6 +12534,36 @@
             }
           }
         },
+        "daily_gas_price": {
+          "description": "Configuration for `conventional.daily_gas_price` settings.",
+          "properties": {
+            "enable": {
+              "default": false,
+              "description": "Replace the monthly World Bank gas price of the CCGT and OCGT generators by the daily price of their gas hub. Each gas day applies from 06:00 CET. Oil and coal keep the monthly prices. Requires `dynamic_fuel_price` and `fuel_price_nominal`.",
+              "type": "boolean"
+            },
+            "default_hub": {
+              "default": "THE",
+              "description": "Hub for countries not in `hubs`. `THE` is the daily average price of exchange trades at Trading Hub Europe (DE), available from gas day 2021-10-01. `MIBGAS` is the MIBGAS-ES day-ahead index (ES/PT).",
+              "enum": [
+                "THE",
+                "MIBGAS"
+              ],
+              "type": "string"
+            },
+            "hubs": {
+              "additionalProperties": {
+                "enum": [
+                  "THE",
+                  "MIBGAS"
+                ],
+                "type": "string"
+              },
+              "description": "Gas hub per country, e.g. `{ES: MIBGAS, PT: MIBGAS}`.",
+              "type": "object"
+            }
+          }
+        },
         "unit_commitment": {
           "default": false,
           "description": "Allow the overwrite of ramp_limit_up, ramp_limit_start_up, ramp_limit_shut_down, p_min_pu, min_up_time, min_down_time, and start_up_cost of conventional generators. Refer to the CSV file 'unit_commitment.csv'.",
@@ -15614,6 +15744,46 @@
           }
         },
         "instrat_co2_prices": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "the_gas_prices": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "mibgas_gas_prices": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {

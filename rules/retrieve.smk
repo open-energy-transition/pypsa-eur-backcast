@@ -1208,6 +1208,66 @@ if (INSTRAT_CO2_PRICES_DATASET := dataset_version("instrat_co2_prices"))["source
             df.to_csv(output["csv"], index=False)
 
 
+if (THE_GAS_PRICES_DATASET := dataset_version("the_gas_prices"))["source"] in [
+    "primary",
+]:
+
+    rule retrieve_the_gas_prices:
+        """Downloads one year of daily Trading Hub Europe imbalance and VTP gas prices from the THE API."""
+        output:
+            xml=f"{THE_GAS_PRICES_DATASET['folder']}/PricesEnergyImbalance_{{year}}.xml",
+        log:
+            "logs/retrieve_the_gas_prices_{year}.log",
+        wildcard_constraints:
+            year=r"\d{4}",
+        retries: 2
+        resources:
+            mem_mb=1000,
+        run:
+            # The API asks for a User-Agent that identifies the retrieving system.
+            headers = {
+                "User-Agent": "pypsa-eur-backcast (+https://github.com/open-energy-transition/pypsa-eur-backcast)"
+            }
+            params = {
+                "startDate": f"{wildcards.year}-01-01",
+                "endDate": f"{wildcards.year}-12-31",
+            }
+            r = requests.get(
+                THE_GAS_PRICES_DATASET["url"],
+                params=params,
+                headers=headers,
+                timeout=120,
+            )
+            r.raise_for_status()
+            with open(output["xml"], "wb") as f:
+                f.write(r.content)
+
+
+if (MIBGAS_GAS_PRICES_DATASET := dataset_version("mibgas_gas_prices"))["source"] in [
+    "primary",
+]:
+
+    rule retrieve_mibgas_gas_prices:
+        """Downloads the annual MIBGAS data file with the daily Iberian gas price indices."""
+        output:
+            xlsx=f"{MIBGAS_GAS_PRICES_DATASET['folder']}/MIBGAS_Data_{{year}}.xlsx",
+        log:
+            "logs/retrieve_mibgas_gas_prices_{year}.log",
+        wildcard_constraints:
+            year=r"\d{4}",
+        retries: 2
+        resources:
+            mem_mb=1000,
+        run:
+            url = MIBGAS_GAS_PRICES_DATASET["url"].format(year=wildcards.year)
+            r = requests.get(
+                url, headers={"User-Agent": "Mozilla/5.0"}, timeout=120
+            )
+            r.raise_for_status()
+            with open(output["xlsx"], "wb") as f:
+                f.write(r.content)
+
+
 if (
     WORLD_BANK_COMMODITY_PRICES_DATASET := dataset_version("worldbank_commodity_prices")
 )["source"] in ["primary", "archive"]:

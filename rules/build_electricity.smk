@@ -458,6 +458,36 @@ rule build_fossil_fuel_prices:
         scripts("build_monthly_prices.py")
 
 
+def input_daily_gas_prices(w) -> dict[str, list[str]]:
+    cfg = config_provider("conventional", "daily_gas_price")(w)
+    hubs = {cfg["default_hub"], *cfg["hubs"].values()}
+    files = {
+        "THE": f"{THE_GAS_PRICES_DATASET['folder']}/PricesEnergyImbalance_{{year}}.xml",
+        "MIBGAS": f"{MIBGAS_GAS_PRICES_DATASET['folder']}/MIBGAS_Data_{{year}}.xlsx",
+    }
+    return {hub: expand(files[hub], year=snapshot_years(w)) for hub in sorted(hubs)}
+
+
+rule build_daily_gas_prices:
+    """Builds daily gas prices per hub from Trading Hub Europe and MIBGAS data."""
+    input:
+        unpack(input_daily_gas_prices),
+    output:
+        gas_price=resources("daily_gas_price.csv"),
+    log:
+        logs("build_daily_gas_prices.log"),
+    benchmark:
+        benchmarks("build_daily_gas_prices")
+    threads: 1
+    resources:
+        mem_mb=2000,
+    params:
+        snapshots=config_provider("snapshots"),
+        drop_leap_day=config_provider("enable", "drop_leap_day"),
+    script:
+        scripts("build_daily_gas_prices.py")
+
+
 def modelled_entsoe_areas(w) -> set[str]:
     area_to_bus = read_area_to_bus(config_provider("backcast", "area_to_bus")(w))
     countries = config_provider("countries")(w)

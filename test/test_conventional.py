@@ -210,3 +210,71 @@ def test_conventional_config_accepts_gas_price_cap():
     gas_cap = {"enable": True, "countries": ["ES", "PT"], "cap": CAP}
     config = ConventionalConfig(dynamic_fuel_price=True, gas_price_cap=gas_cap)
     assert config.gas_price_cap.cap == CAP
+
+
+def test_daily_gas_price_per_hub_before_cap():
+    n = pypsa.Network()
+    n.set_snapshots(DAYS)
+    n.add("Bus", ["ES00", "FR00"], country=["ES", "FR"])
+    costs = pd.DataFrame(
+        {"fuel": 0.0, "VOM": 0.0, "CO2 intensity": 0.0}, index=["CCGT", "coal"]
+    )
+    ppl = pd.DataFrame(
+        {
+            "carrier": ["CCGT", "CCGT", "coal"],
+            "bus": ["ES00", "FR00", "ES00"],
+            "p_nom": 100.0,
+            "efficiency": 0.5,
+            "marginal_cost": 0.0,
+            "capital_cost": 0.0,
+            "build_year": 2000,
+            "lifetime": 50.0,
+        },
+        index=["ES CCGT", "FR CCGT", "ES coal"],
+    )
+    fuel_price = pd.DataFrame({"gas": 60.0, "coal": 60.0}, index=DAYS)
+    gas_price = pd.DataFrame(
+        {"THE": [40.0, 45.0, 50.0], "MIBGAS": [55.0, 52.0, 75.0]}, index=DAYS
+    )
+    conventional = {
+        "gas_price_cap": {"enable": True, "countries": ["ES"], "cap": CAP},
+        "daily_gas_price": {"default_hub": "THE", "hubs": {"ES": "MIBGAS"}},
+    }
+    attach_conventional_generators(
+        n,
+        costs,
+        ppl,
+        ["CCGT", "coal"],
+        {"Generator": []},
+        set(),
+        conventional,
+        {},
+        fuel_price=fuel_price,
+        gas_price=gas_price,
+    )
+    marginal_cost = n.generators_t.marginal_cost
+    np.testing.assert_allclose(marginal_cost["ES CCGT"], [110.0, 100.0, 140.0])
+    np.testing.assert_allclose(marginal_cost["FR CCGT"], [80.0, 90.0, 100.0])
+    np.testing.assert_allclose(marginal_cost["ES coal"], 120.0)
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"daily_gas_price": {"enable": True}},
+        {"dynamic_fuel_price": True, "daily_gas_price": {"enable": True}},
+        {"daily_gas_price": {"hubs": {"IT": "PSV"}}},
+    ],
+    ids=["static-fuel-price", "real-fuel-price", "unknown-hub"],
+)
+def test_conventional_config_rejects_invalid_daily_gas_price(config):
+    with pytest.raises(ValidationError):
+        ConventionalConfig(**config)
+
+
+def test_conventional_config_accepts_daily_gas_price():
+    daily = {"enable": True, "hubs": {"ES": "MIBGAS", "PT": "MIBGAS"}}
+    config = ConventionalConfig(
+        dynamic_fuel_price=True, fuel_price_nominal=True, daily_gas_price=daily
+    )
+    assert config.daily_gas_price.default_hub == "THE"

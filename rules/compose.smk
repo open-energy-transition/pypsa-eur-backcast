@@ -63,6 +63,11 @@ def get_compose_inputs(w):
             if cfg["conventional"]["dynamic_fuel_price"]
             else []
         ),
+        gas_price=(
+            resources("daily_gas_price.csv")
+            if cfg["conventional"]["daily_gas_price"]["enable"]
+            else []
+        ),
         co2_price=resources("co2_price.csv"),
         eurostat=(
             resources("eurostat_energy_balances.csv")
