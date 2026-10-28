@@ -563,6 +563,45 @@ rule build_entsoe_generation:
         scripts("build_entsoe_generation.py")
 
 
+def unavailability_areas(w) -> list[str]:
+    return sorted(modelled_entsoe_areas(w))
+
+
+def input_unavailability(w) -> dict[str, list[str]]:
+    return {
+        area: expand(
+            f"{ENTSOE_UNAVAILABILITY_DATA['folder']}/unavailability_{area}_{{year}}.csv",
+            year=snapshot_years(w),
+        )
+        for area in unavailability_areas(w)
+    }
+
+
+rule build_unavailability:
+    """Builds the hourly unavailable share of thermal capacity per bus and carrier from ENTSO-E outages."""
+    input:
+        unpack(input_unavailability),
+        powerplants=resources("powerplants.csv"),
+        area_to_bus=config_provider("backcast", "area_to_bus"),
+    output:
+        csv=resources("unavailability.csv"),
+        coverage=resources("unavailability_coverage.csv"),
+    log:
+        logs("build_unavailability.log"),
+    benchmark:
+        benchmarks("build_unavailability")
+    threads: 1
+    resources:
+        mem_mb=6000,
+    params:
+        snapshots=config_provider("snapshots"),
+        drop_leap_day=config_provider("enable", "drop_leap_day"),
+        areas=unavailability_areas,
+        carriers=config_provider("backcast", "unavailability", "carriers"),
+    script:
+        scripts("build_unavailability.py")
+
+
 rule build_cross_border_capacities:
     """Builds hourly cross-border capacities between the buses of the bidding zone clustered network."""
     input:

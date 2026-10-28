@@ -48,6 +48,7 @@ from scripts.lib.backcast_calibration import (
 from scripts.lib.conventional import clip_p_min_pu, spread_marginal_cost
 from scripts.lib.cross_border import apply_cross_border_capacities, raise_to_physical
 from scripts.lib.entsoe import assert_known_areas, read_area_to_bus
+from scripts.lib.unavailability import apply_unavailability
 from scripts.prepare_network import (
     apply_co2_budget_constraints,
     apply_temporal_aggregation,
@@ -72,7 +73,8 @@ def apply_backcast(
     ntc = electricity["cross_border_capacities"] == "ntc"
     wind = backcast["calibrate_wind"]
     nuclear = backcast["monthly_nuclear_availability"]
-    if not (ntc or wind or nuclear):
+    unavailability = backcast["unavailability"]
+    if not (ntc or wind or nuclear or unavailability["enable"]):
         return
     area_to_bus = read_area_to_bus(inputs.area_to_bus)
     if ntc:
@@ -111,6 +113,17 @@ def apply_backcast(
             area_to_bus,
             "nuclear",
             backcast["nuclear_area_map"],
+            backcast["nuclear_phase_out"],
+        )
+    if unavailability["enable"]:
+        apply_unavailability(
+            n,
+            pd.read_csv(
+                inputs.unavailability, index_col=0, header=[0, 1], parse_dates=True
+            ),
+            pd.read_csv(inputs.unavailability_coverage, index_col=[0, 1]),
+            area_to_bus,
+            unavailability["min_coverage"],
             backcast["nuclear_phase_out"],
         )
 

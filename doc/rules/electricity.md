@@ -24,6 +24,10 @@ and hydro power. Their outputs are attached to the clustered network by
 
 {{ rules("build_entsoe_generation") }}
 
+## Unavailability of thermal units
+
+{{ rules("build_unavailability") }}
+
 ## Cross-border capacities
 
 {{ rules("build_cross_border_capacities") }}

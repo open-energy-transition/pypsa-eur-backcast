@@ -258,10 +258,13 @@ class ConfigSchema(BaseModel):
     def check_backcast_calibration_foresight(self) -> "ConfigSchema":
         """Require overnight foresight for the backcast calibration."""
         calibrate = (
-            self.backcast.calibrate_wind or self.backcast.monthly_nuclear_availability
+            self.backcast.calibrate_wind
+            or self.backcast.monthly_nuclear_availability
+            or self.backcast.unavailability.enable
         )
         assert self.foresight.root == "overnight" or not calibrate, (
-            "backcast: calibrate_wind and monthly_nuclear_availability require foresight: overnight."
+            "backcast: calibrate_wind, monthly_nuclear_availability and "
+            "unavailability require foresight: overnight."
         )
         return self
 

@@ -595,6 +595,17 @@ backcast:
     - RO
     - SI
     - SK
+  unavailability:
+    enable: false
+    carriers:
+    - CCGT
+    - OCGT
+    - coal
+    - lignite
+    - oil
+    - nuclear
+    min_coverage:
+      nuclear: 0.9
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration/#pypsa_eur_cf
 pypsa_eur:
@@ -1551,6 +1562,9 @@ data:
     source: build
     version: latest
   entsoe_actual_generation:
+    source: build
+    version: latest
+  entsoe_unavailability:
     source: build
     version: latest
   entsoe_cross_border_capacities:

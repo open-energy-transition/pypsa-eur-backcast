@@ -592,6 +592,32 @@
               "type": "array"
             }
           }
+        },
+        "unavailability": {
+          "description": "Configuration for `backcast.unavailability` settings.",
+          "properties": {
+            "enable": {
+              "default": false,
+              "description": "Set the availability (`p_max_pu`) of the generators of the `carriers` per bus to one minus the hourly unavailable share of their capacity from the unavailability of generation and production units published on the ENTSO-E Transparency Platform (planned and forced outages). The production units are matched to powerplantmatching by EIC code, else by name and capacity. The availability replaces `monthly_nuclear_availability` in areas with enough nuclear outage data (`min_coverage`). Nuclear generators of areas in `nuclear_phase_out` get zero availability after their last operating date. Requires `foresight: overnight`.",
+              "type": "boolean"
+            },
+            "carriers": {
+              "description": "Generator carriers whose availability is set from the outage data.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "min_coverage": {
+              "additionalProperties": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "description": "Minimum share of the capacity of a carrier in an ENTSO-E area matched to production units with outage data, below which the generators keep their availability, e.g. the monthly nuclear availability. Zero for carriers not given.",
+              "type": "object"
+            }
+          }
         }
       }
     },
@@ -1844,6 +1870,26 @@
           }
         },
         "entsoe_actual_generation": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "entsoe_unavailability": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {
@@ -6949,6 +6995,32 @@
             "keep"
           ],
           "type": "string"
+        }
+      }
+    },
+    "UnavailabilityConfig": {
+      "description": "Configuration for `backcast.unavailability` settings.",
+      "properties": {
+        "enable": {
+          "default": false,
+          "description": "Set the availability (`p_max_pu`) of the generators of the `carriers` per bus to one minus the hourly unavailable share of their capacity from the unavailability of generation and production units published on the ENTSO-E Transparency Platform (planned and forced outages). The production units are matched to powerplantmatching by EIC code, else by name and capacity. The availability replaces `monthly_nuclear_availability` in areas with enough nuclear outage data (`min_coverage`). Nuclear generators of areas in `nuclear_phase_out` get zero availability after their last operating date. Requires `foresight: overnight`.",
+          "type": "boolean"
+        },
+        "carriers": {
+          "description": "Generator carriers whose availability is set from the outage data.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "min_coverage": {
+          "additionalProperties": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "description": "Minimum share of the capacity of a carrier in an ENTSO-E area matched to production units with outage data, below which the generators keep their availability, e.g. the monthly nuclear availability. Zero for carriers not given.",
+          "type": "object"
         }
       }
     },
@@ -12980,6 +13052,32 @@
               "type": "array"
             }
           }
+        },
+        "unavailability": {
+          "description": "Configuration for `backcast.unavailability` settings.",
+          "properties": {
+            "enable": {
+              "default": false,
+              "description": "Set the availability (`p_max_pu`) of the generators of the `carriers` per bus to one minus the hourly unavailable share of their capacity from the unavailability of generation and production units published on the ENTSO-E Transparency Platform (planned and forced outages). The production units are matched to powerplantmatching by EIC code, else by name and capacity. The availability replaces `monthly_nuclear_availability` in areas with enough nuclear outage data (`min_coverage`). Nuclear generators of areas in `nuclear_phase_out` get zero availability after their last operating date. Requires `foresight: overnight`.",
+              "type": "boolean"
+            },
+            "carriers": {
+              "description": "Generator carriers whose availability is set from the outage data.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "min_coverage": {
+              "additionalProperties": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "description": "Minimum share of the capacity of a carrier in an ENTSO-E area matched to production units with outage data, below which the generators keep their availability, e.g. the monthly nuclear availability. Zero for carriers not given.",
+              "type": "object"
+            }
+          }
         }
       }
     },
@@ -15994,6 +16092,26 @@
           }
         },
         "entsoe_actual_generation": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "entsoe_unavailability": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {
