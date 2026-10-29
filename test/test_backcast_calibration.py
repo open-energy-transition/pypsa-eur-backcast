@@ -339,6 +339,47 @@ def test_apply_monthly_availability(network, observed, phase_out, expected):
         np.testing.assert_allclose(p_max_pu[gen], expected)
 
 
+def test_apply_monthly_availability_keep_unpublished(network, caplog):
+    caplog.set_level("INFO")
+    apply_monthly_availability(
+        network,
+        frame({("ES", "onwind", "2023-01-01"): (1.0, 2)}),
+        AREA_TO_BUS,
+        "nuclear",
+        {},
+        {},
+        keep_unpublished=True,
+    )
+    p_max_pu = network.get_switchable_as_dense("Generator", "p_max_pu")
+    for gen in ["ES00 nuclear", "ESCE nuclear"]:
+        np.testing.assert_allclose(p_max_pu[gen], 0.9)
+    assert "No actual nuclear generation published for ['ES']" in caplog.text
+
+
+def test_apply_monthly_availability_exclude(network, caplog):
+    caplog.set_level("INFO")
+    apply_monthly_availability(
+        network,
+        frame(ES_NUCLEAR_JAN | {("ES", "nuclear", "2023-02-01"): (2000.0, 2)}),
+        AREA_TO_BUS,
+        "nuclear",
+        {},
+        {},
+        exclude=["ES"],
+    )
+    p_max_pu = network.get_switchable_as_dense("Generator", "p_max_pu")
+    for gen in ["ES00 nuclear", "ESCE nuclear"]:
+        np.testing.assert_allclose(p_max_pu[gen], 0.9)
+    assert "Excluded ['ES'] from the monthly nuclear availability" in caplog.text
+
+
+def test_apply_monthly_availability_exclude_raises(network):
+    with pytest.raises(AssertionError, match="Unknown ENTSO-E"):
+        apply_monthly_availability(
+            network, frame(ES_NUCLEAR_JAN), AREA_TO_BUS, "nuclear", {}, {}, exclude=["XX"]
+        )
+
+
 @pytest.mark.parametrize(
     "observed, area_map, phase_out, match",
     [

@@ -23,7 +23,12 @@ def clip_p_min_pu(n: pypsa.Network) -> None:
     clipped = gens[(p_min_pu > p_max_pu).any()]
     if clipped.empty:
         return
-    n.generators_t.p_min_pu[clipped] = p_min_pu[clipped].clip(upper=p_max_pu[clipped])
+    result = p_min_pu[clipped].clip(upper=p_max_pu[clipped])
+    n.generators_t.p_min_pu[clipped] = result
+    # The netCDF export drops constant time series, which would restore the static
+    # value on import, so constant clipped series also set the static value.
+    constant = result.columns[result.nunique() == 1]
+    n.generators.loc[constant, "p_min_pu"] = result[constant].iloc[0]
     logger.info(f"Clipped p_min_pu to p_max_pu for {len(clipped)} generators.")
 
 

@@ -87,6 +87,9 @@ def test_areas_known(scenario):
         "wind_target_twh": backcast.get("wind_target_twh", {}),
         "wind_curtailment_twh": backcast.get("wind_curtailment_twh", {}),
         "nuclear_phase_out": backcast.get("nuclear_phase_out", {}),
+        "monthly_availability_exclude": [
+            a for areas in backcast.get("monthly_availability_exclude", {}).values() for a in areas
+        ],
     }
     for key, areas in configured.items():
         unknown = sorted(set(areas) - known)

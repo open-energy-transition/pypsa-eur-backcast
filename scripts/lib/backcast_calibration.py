@@ -221,6 +221,8 @@ def apply_monthly_availability(
     carrier: str,
     area_map: dict[str, str],
     phase_out: dict[str, str],
+    keep_unpublished: bool = False,
+    exclude: list[str] | None = None,
 ) -> None:
     """
     Set the availability of a carrier per area and month to its actual capacity factor.
@@ -231,7 +233,12 @@ def apply_monthly_availability(
     zero. Every month with snapshots before it must have actual generation.
     Generators of areas without any published generation keep their
     availability. Generators of the keys of `area_map` are pooled with the
-    area they map to.
+    area they map to. With `keep_unpublished`, generators of areas that
+    publish generation, but none of the carrier, also keep their availability
+    instead of raising an error. Generators of areas in `exclude` keep their
+    availability regardless of published generation, e.g. a flexible plant
+    fleet whose monthly mean capacity factor would wrongly flatten its hourly
+    dispatch, such as a carrier used as a swing exporter.
 
     Parameters
     ----------
@@ -247,21 +254,46 @@ def apply_monthly_availability(
         Area whose generators are calibrated with the actual generation of another area.
     phase_out : dict[str, str]
         Last operating date of the carrier per area as ISO date.
+    keep_unpublished : bool
+        Keep the availability of the carrier in areas that publish generation,
+        but none of the carrier.
+    exclude : list[str] | None
+        ENTSO-E areas kept at their availability regardless of published
+        generation.
     """
+    exclude = exclude or []
     assert_known_areas(
-        [*area_map, *area_map.values(), *phase_out],
+        [*area_map, *area_map.values(), *phase_out, *exclude],
         area_to_bus,
         f"the monthly {carrier} availability",
     )
     g = n.generators.query("carrier == @carrier")
     assert_mapped(g, area_to_bus)
     areas = g.bus.map(area_to_bus).replace(area_map)
-    published = areas.isin(generation.index.unique("area"))
-    if not published.all():
+    published = areas.isin(generation.index.unique("area")) & ~areas.isin(exclude)
+    if not areas.isin(generation.index.unique("area")).all():
         logger.info(
-            f"No actual generation published for {sorted(areas[~published].unique())}, "
+            f"No actual generation published for "
+            f"{sorted(areas[~areas.isin(generation.index.unique('area'))].unique())}, "
             f"keeping their {carrier} availability."
         )
+    if exclude:
+        excluded = areas.isin(exclude)
+        if excluded.any():
+            logger.info(
+                f"Excluded {sorted(areas[excluded].unique())} from the monthly "
+                f"{carrier} availability, keeping their availability."
+            )
+    if keep_unpublished:
+        is_carrier = generation.index.get_level_values("carrier") == carrier
+        carrier_areas = generation.index[is_carrier].unique("area")
+        unpublished = published & ~areas.isin(carrier_areas)
+        if unpublished.any():
+            logger.info(
+                f"No actual {carrier} generation published for "
+                f"{sorted(areas[unpublished].unique())}, keeping their {carrier} availability."
+            )
+        published &= ~unpublished
     areas = areas[published]
     capacity = g.p_nom[areas.index].groupby(areas).sum()
     ignored = sorted(set(phase_out) - set(capacity.index))
@@ -271,6 +303,7 @@ def apply_monthly_availability(
     )
     power = carrier_generation(generation, [carrier]).droplevel("carrier")
     power = power.unstack("area").reindex(columns=capacity.index)
+    months = snapshot_months(n)
     end = pd.Series(
         {
             area: pd.Timestamp(date) + pd.Timedelta(days=1)
@@ -283,7 +316,6 @@ def apply_monthly_availability(
         index=n.snapshots,
         columns=capacity.index,
     )
-    months = snapshot_months(n)
     for area in capacity.index:
         required = months[operating[area].values].unique()
         missing = required.difference(power[area].dropna().index)

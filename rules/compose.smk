@@ -25,6 +25,7 @@ def get_compose_inputs(w):
     calibrate = (
         cfg["backcast"]["calibrate_wind"]
         or cfg["backcast"]["monthly_nuclear_availability"]
+        or cfg["backcast"]["monthly_availability_carriers"]
     )
     spread = cfg["conventional"]["marginal_cost_spread"]
     observed_spread = spread["enable"] and spread["reference"] == "observed"

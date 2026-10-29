@@ -211,6 +211,12 @@ backcast-2022:
       IT_CALA-IT_CSUD: physical
     exchange_proxy_fallback: true  # Core NTCs end with flow-based market coupling on 2022-06-08, EE-FI, EE-LV and HU-RO offered capacities have gaps of 8 to 16 days
     exclude_generation_areas: [AL, GB]
+    monthly_availability_carriers: [coal, lignite, biomass, waste]  # with gas at 100-340 EUR/MWh these run at full availability in the model; without calibration coal fills the gap left by the other three, e.g. Jul-Sep 110 TWh lignite and 45 TWh biomass against 67 and 19 TWh in ENTSO-E
+    monthly_availability_exclude:  # the Baltic-Nordic pool's smaller thermal fleets act as flexible swing or CHP capacity; flattening them to the monthly mean removes their ramp-up for tight hours and spikes prices across the hydro-coupled pool instead
+      coal: [PL, FI, EE, LV, LT, SE_1, SE_2, SE_3, SE_4]  # PL coal is already near its physical ceiling (annual CF 0.55, peak/p_nom 0.98) and used as a swing exporter to the pool
+      lignite: [FI, EE, LV, LT, SE_1, SE_2, SE_3, SE_4]
+      biomass: [FI, EE, LV, LT, SE_1, SE_2, SE_3, SE_4]  # FI's 4.1 GW biomass CHP fleet runs at CF 0.17-0.26, heat-driven and seasonal, not monthly-flat
+      waste: [FI, EE, LV, LT, SE_1, SE_2, SE_3, SE_4]
     wind_calibration_exclude:
       IT_CALA: [onwind]
       RS: [onwind]  # factor 2.93, ENTSO-E RS wind generation is published only from 2022-03

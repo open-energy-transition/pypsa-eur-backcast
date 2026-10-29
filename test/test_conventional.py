@@ -59,6 +59,17 @@ def test_clip_p_min_pu(network):
     assert network.generators_t.p_min_pu.columns.tolist() == ["nuclear"]
 
 
+def test_clip_p_min_pu_to_zero_survives_export(network, tmp_path):
+    network.generators_t.p_max_pu["lignite"] = 0.0
+    clip_p_min_pu(network)
+    network.export_to_netcdf(tmp_path / "network.nc")
+
+    n = pypsa.Network(tmp_path / "network.nc")
+    p_min_pu = n.get_switchable_as_dense("Generator", "p_min_pu")
+    np.testing.assert_allclose(p_min_pu.lignite, 0.0)
+    np.testing.assert_allclose(p_min_pu.nuclear, [0.2, 0.3, 0.3])
+
+
 @pytest.mark.parametrize(
     "spread, utilisation",
     [(0.3, 0.35), (0.5, 0.5), (0.0, 0.35)],

@@ -578,6 +578,8 @@ backcast:
   wind_curtailment_twh: {}
   wind_target_twh: {}
   monthly_nuclear_availability: false
+  monthly_availability_carriers: []
+  monthly_availability_exclude: {}
   nuclear_area_map: {}
   nuclear_phase_out: {}
   exclude_generation_areas: []
