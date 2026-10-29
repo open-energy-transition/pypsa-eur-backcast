@@ -86,6 +86,51 @@ backcast-2019-plain:  # unrefined 2019 reference: 2019 without the hydro, must-r
     hybrid_capacities:
       enable: false
 
+backcast-2020:
+  snapshots:
+    start: "2020-01-01"
+    end: "2021-01-01"
+
+  atlite:
+    default_cutout: europe-2020-sarah3-era5
+
+  electricity:
+    powerplants_filter: "(DateOut >= 2020 or DateOut != DateOut) and (DateIn <= 2020 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen'])"
+    custom_powerplants: "Country == 'NL' and (DateOut >= 2020 or DateOut != DateOut) and (DateIn <= 2020 or DateIn != DateIn)"
+    estimate_renewable_capacities:
+      year: 2020
+
+  conventional:
+    estimate_efficiencies:
+      reference_year: 2020
+
+  backcast:
+    area_to_bus: data/entsoe_area_to_bus-pre2021.csv
+    borders: data/entsoe_borders-pre2021.csv
+    exclude_price_areas: [AL, BA, BG, GB, ME, MK, PL, RO, XK]
+    max_capacity_gap_hours: 744  # EE-FI and FI-NO_4 offered capacities end 2020-12-01, FI-NO_4 has no scheduled exchanges
+    fixed_border_capacities:
+      AL-XK: physical
+      BE-DE_LU: 0  # ALEGrO in market operation only from 2020-11-18
+      BG-MK: physical
+      DE_LU-NO_2: 0  # NordLink in trial operation only from 2020-12
+      DK_1-GB: 0
+      GB-NO_2: 0
+      HU-SI: 0
+      IT_CSUD-IT_ROSN: physical
+      ME-XK: physical
+      MK-XK: physical
+      RS-XK: physical
+    exchange_proxy_fallback: true  # AT-DE_LU NTC ends 2020-03-31, LT-LV offered capacity missing 2020-03-02 to 2020-05-01
+    exclude_generation_areas: [AL, GB, SE_3, SE_4, XK]
+    wind_calibration_exclude:
+      RO: [onwind]
+    wind_calibration_factor_bounds: [0.35, 2.1]  # AT onwind needs 2.02 (2019: 1.96, 2023: 1.76, 2024: 1.92)
+    wind_target_twh:
+      GB: {onwind: 31.6, offwind: 40.7}  # DESNZ DUKES 2021 UK minus NI wind 3.10 TWh (DfE NI renewable generation statistics 2020: 3651 GWh, 84.9 % wind)
+    wind_curtailment_twh:
+      DE_LU: {onwind: 4.1, offwind: 1.8}  # BNetzA Monitoringbericht 2021, Tabelle 64: EinsMan 2020 onshore 4145 GWh, offshore 1797 GWh
+
 backcast-2023:
   snapshots:
     start: "2023-01-01"
