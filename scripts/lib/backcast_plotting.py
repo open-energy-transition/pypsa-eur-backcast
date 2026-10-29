@@ -49,7 +49,7 @@ ZONE_GROUPS = {
         "DK_2",
     ],
     "Baltic": ["EE", "LV", "LT"],
-    "Ireland": ["IE_SEM"],
+    "British Isles": ["IE_SEM", "GB"],
 }
 ZONE_ORDER = [area for areas in ZONE_GROUPS.values() for area in areas]
 CARRIER_ORDER = [

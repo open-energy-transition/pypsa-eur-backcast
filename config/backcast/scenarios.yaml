@@ -35,7 +35,9 @@ backcast-2019: &backcast-2019
   backcast: &backcast-2019-backcast
     area_to_bus: data/entsoe_area_to_bus-pre2021.csv
     borders: data/entsoe_borders-pre2021.csv
-    exclude_price_areas: [AL, BA, BG, GB, ME, MK, PL, RO, XK]
+    exclude_price_areas: [AL, BA, ME, MK, XK]
+    max_price_gap_hours_by_area:
+      GB: 24  # ENTSO-E publishes no GB day-ahead price for 2019-06-08
     max_capacity_gap_hours: 720
     fixed_border_capacities:
       AL-XK: physical

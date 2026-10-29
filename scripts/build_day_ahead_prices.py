@@ -5,7 +5,9 @@
 Builds hourly observed day-ahead electricity prices per bus of the bidding zone clustered network.
 
 The ENTSO-E prices per bidding zone are converted to UTC, resampled to hourly
-means and restricted to the snapshots. Gaps of up to
+means and restricted to the snapshots. Prices published in a local currency are
+converted to EUR with the ECB euro reference rate of their UTC day, or the last
+published rate on days without one (weekends and TARGET holidays). Gaps of up to
 ``MAX_INTERPOLATE_PRICE_GAP_HOURS`` are interpolated, gaps up to
 ``backcast: max_price_gap_hours`` (or the area specific value in
 ``backcast: max_price_gap_hours_by_area``) are kept as missing values and longer
@@ -31,6 +33,31 @@ logger = logging.getLogger(__name__)
 def to_hourly_utc(prices: pd.Series) -> pd.Series:
     """Convert timezone-aware prices to hourly means with naive UTC timestamps."""
     return prices.tz_convert("UTC").resample("h").mean().tz_localize(None)
+
+
+def read_prices(path: str) -> tuple[pd.Series, str]:
+    """Read the retrieved prices of one area and their currency, EUR for files retrieved before the currency was stored."""
+    frame = pd.read_csv(path, index_col=0, parse_dates=True)
+    currency = frame.pop("currency").iloc[0] if "currency" in frame else "EUR"
+    return frame.squeeze("columns"), currency
+
+
+def read_exchange_rates(path: str) -> pd.DataFrame:
+    """Read the daily ECB reference rates in units of each currency per EUR."""
+    rates = pd.read_csv(path, index_col="Date", parse_dates=True, na_values="N/A")
+    return rates.sort_index()
+
+
+def to_eur(prices: pd.Series, currency: str, rates: pd.DataFrame) -> pd.Series:
+    """Convert hourly prices with naive UTC timestamps to EUR with the reference rate of their day or the last one before."""
+    if currency == "EUR":
+        return prices
+    rate = rates[currency].dropna()
+    days = prices.index.normalize()
+    assert days.min() >= rate.index[0] and days.max() <= rate.index[-1], (
+        f"No ECB {currency} rate for all days of {prices.name}"
+    )
+    return prices / rate.reindex(days, method="ffill").to_numpy()
 
 
 def map_areas_to_buses(
@@ -64,12 +91,16 @@ if __name__ == "__main__":
     area_to_bus = read_area_to_bus(snakemake.input.area_to_bus)
     buses = pypsa.Network(snakemake.input.network).buses.query("carrier == 'AC'").index
 
-    raw = [
-        pd.read_csv(fn, index_col=0, parse_dates=True).squeeze("columns")
-        for fn in snakemake.input.prices
-    ]
+    rates = read_exchange_rates(snakemake.input.exchange_rates)
+    raw = [read_prices(fn) for fn in snakemake.input.prices]
+    for s, currency in raw:
+        if currency != "EUR":
+            logger.info(
+                f"Converting day-ahead prices of {s.name} from {currency} to EUR."
+            )
     hourly = pd.concat(
-        [to_hourly_utc(s) for s in raw], keys=[s.name for s in raw]
+        [to_eur(to_hourly_utc(s), currency, rates) for s, currency in raw],
+        keys=[s.name for s, _ in raw],
     ).unstack(level=0)
 
     prices = fill_short_gaps(

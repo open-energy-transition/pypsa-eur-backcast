@@ -1507,6 +1507,9 @@ data:
   mibgas_gas_prices:
     source: primary
     version: latest
+  ecb_exchange_rates:
+    source: primary
+    version: latest
   co2stop:
     source: archive
     version: latest

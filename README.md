@@ -98,7 +98,7 @@ Every run in `dashboard/cache/` is published, so remove local runs you do not wa
   while Finland (-18.5), Ireland (-11.5) and Sicily (-9.4) are too cheap. In 2019 Sicily (-17.7) and Greece (-11.7) are too cheap.
 - The Norwegian zones NO_1, NO_2 and NO_5 separate in 44 % of 2023 model hours (observed 38 %). The hydro inflow split per zone is uncertain.
 - The south-east chain (HU, SK, HR) shares one price more often than the market. The Baltics and other edge zones miss the daily shape.
-- 2019 prices of PL, RO, BG and GB are published in local currency and are not scored yet.
+- 2021 prices of BG and RO are published in local currency and are not scored yet.
 - The ENTSO-E NTC download is slow (98 border retrievals per year). `backcast.max_capacity_gap_hours: 48` equals the longest 2023 gap.
 - Only one Gurobi licence is used, so solves run one after another.
 - Biomass and solar calibration should be re-tested once the level errors (scarcity, hydro water values) are fixed.

@@ -1268,6 +1268,30 @@ if (MIBGAS_GAS_PRICES_DATASET := dataset_version("mibgas_gas_prices"))["source"]
                 f.write(r.content)
 
 
+if (ECB_EXCHANGE_RATES_DATASET := dataset_version("ecb_exchange_rates"))["source"] in [
+    "primary",
+]:
+
+    rule retrieve_ecb_exchange_rates:
+        """Downloads the daily ECB euro reference rates since 1999 and unpacks the csv."""
+        output:
+            csv=f"{ECB_EXCHANGE_RATES_DATASET['folder']}/eurofxref-hist.csv",
+        log:
+            "logs/retrieve_ecb_exchange_rates.log",
+        retries: 2
+        resources:
+            mem_mb=1000,
+        run:
+            from io import BytesIO
+            from zipfile import ZipFile
+
+            r = requests.get(ECB_EXCHANGE_RATES_DATASET["url"], timeout=120)
+            r.raise_for_status()
+            with ZipFile(BytesIO(r.content)) as archive:
+                with open(output["csv"], "wb") as f:
+                    f.write(archive.read("eurofxref-hist.csv"))
+
+
 if (
     WORLD_BANK_COMMODITY_PRICES_DATASET := dataset_version("worldbank_commodity_prices")
 )["source"] in ["primary", "archive"]:

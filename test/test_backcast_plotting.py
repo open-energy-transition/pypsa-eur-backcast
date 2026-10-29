@@ -44,7 +44,7 @@ def test_ordered_areas():
 
 def test_ordered_areas_rejects_unknown_area():
     with pytest.raises(AssertionError, match="ZONE_GROUPS"):
-        ordered_areas(["GB"])
+        ordered_areas(["XX"])
 
 
 @pytest.mark.parametrize(
