@@ -36,6 +36,7 @@ PERIODS = ["year", *MONTH_NAMES, "winter week", "summer week", "custom"]
 AGGREGATIONS = {"hourly": None, "daily": "D"}
 TOP_SHARE = 0.05
 FOCUS_AREA = "DE_LU"
+GENERATION_SOURCES = ["model", "entsoe"]
 TOP_ERROR = f"error in top {TOP_SHARE:.0%} hours (€/MWh)"
 EXPORT_MODEL = f"{FOCUS_AREA} net export model (TWh)"
 EXPORT_SCHEDULED = f"{FOCUS_AREA} net export scheduled (TWh)"
@@ -233,19 +234,55 @@ def source_generation(generation: pd.DataFrame, source: str, area: str) -> pd.Da
     return frame[area]
 
 
-def carrier_errors(
-    generation: pd.DataFrame, area: str, hours: pd.DatetimeIndex
-) -> pd.DataFrame:
-    """Model and ENTSO-E energy in TWh per carrier of an area with absolute and relative error."""
-    energy = {
-        source: source_generation(generation, source, area).reindex(hours).sum() / 1e6
-        for source in ["model", "entsoe"]
-    }
+def energy_errors(energy: dict[str, pd.Series]) -> pd.DataFrame:
+    """Model and ENTSO-E energy per carrier with absolute and relative error, without carriers that are zero in both."""
     table = pd.DataFrame(energy).fillna(0.0)
     table = table[(table != 0).any(axis=1)]
     table["error"] = table.model - table.entsoe
     table["error %"] = 100 * table.error / table.entsoe.where(table.entsoe > 0)
     return table
+
+
+def carrier_errors(
+    generation: pd.DataFrame, area: str, hours: pd.DatetimeIndex
+) -> pd.DataFrame:
+    """Model and ENTSO-E energy in TWh per carrier of an area with absolute and relative error."""
+    return energy_errors(
+        {
+            source: source_generation(generation, source, area).reindex(hours).sum()
+            / 1e6
+            for source in GENERATION_SOURCES
+        }
+    )
+
+
+def generation_areas(generation: pd.DataFrame) -> pd.Index:
+    """Areas with generation in both the model and ENTSO-E."""
+    model, entsoe = (generation[s].columns.unique("area") for s in GENERATION_SOURCES)
+    return model.intersection(entsoe)
+
+
+def area_energy(
+    generation: pd.DataFrame, source: str, hours: pd.DatetimeIndex
+) -> pd.DataFrame:
+    """Energy in TWh per area and carrier of a source over the hours, for the areas with generation in both sources."""
+    frame = generation[source].reindex(hours)
+    frame = frame.loc[
+        :, frame.columns.get_level_values("area").isin(generation_areas(generation))
+    ]
+    return frame.sum().unstack("carrier").fillna(0.0) / 1e6
+
+
+def total_carrier_errors(
+    generation: pd.DataFrame, hours: pd.DatetimeIndex
+) -> pd.DataFrame:
+    """Model and ENTSO-E energy in TWh per carrier summed over the areas with generation in both sources."""
+    return energy_errors(
+        {
+            source: area_energy(generation, source, hours).sum()
+            for source in GENERATION_SOURCES
+        }
+    )
 
 
 def border_positions(

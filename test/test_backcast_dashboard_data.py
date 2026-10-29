@@ -274,6 +274,35 @@ def test_net_export(run_dir):
     )
 
 
+def test_total_carrier_errors_sum_areas_with_both_sources():
+    hours = HOURS[:2]
+    generation = pd.DataFrame(
+        {
+            ("model", "DE_LU", "gas"): 1e6,
+            ("model", "DE_LU", "solar"): 2e6,
+            ("model", "FR", "nuclear"): 3e6,
+            ("model", "GB", "gas"): 5e6,
+            ("entsoe", "DE_LU", "gas"): 1.5e6,
+            ("entsoe", "FR", "nuclear"): 3e6,
+        },
+        hours,
+    ).rename_axis(columns=["source", "area", "carrier"])
+
+    table = data.total_carrier_errors(generation, hours)
+
+    assert data.generation_areas(generation).tolist() == ["DE_LU", "FR"]
+    expected = pd.DataFrame(
+        {
+            "model": [2.0, 6.0, 4.0],
+            "entsoe": [3.0, 6.0, 0.0],
+            "error": [-1.0, 0.0, 4.0],
+            "error %": [-100 / 3, 0.0, np.nan],
+        },
+        ["gas", "nuclear", "solar"],
+    )
+    pd.testing.assert_frame_equal(table, expected, check_names=False)
+
+
 def test_story_spike_card_uses_how_it_works_median(run_dir):
     pytest.importorskip("streamlit")
     from dashboard.views.overview import plain_error, puzzles
