@@ -120,6 +120,16 @@ neighbours with flat prices can pull the price down. And the water flowing into 
 zones of one country, is uncertain.
 """
 
+ENERGY = """
+Prices follow the plants that run. Below, the energy of each kind of plant in the model is set against
+what ENTSO-E reports, first summed over all zones, then per zone.
+"""
+
+ENERGY_LEAD = """
+Across the {zones} zones with ENTSO-E generation data the model produces **{model:.0f} TWh**, ENTSO-E reports
+**{entsoe:.0f} TWh**. Largest gaps per kind of plant: {gaps}. Largest single gap: **{carrier}** in {zone}, {value:+.1f} TWh.
+"""
+
 MISSES = """
 The misses are not random. Below they are split by month, by price level and by hour of day.
 Red means the model is too expensive, blue means too cheap.

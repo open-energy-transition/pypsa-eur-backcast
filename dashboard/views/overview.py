@@ -29,7 +29,14 @@ from dashboard.data import (
     summary,
 )
 from dashboard.state import follow_selection, open_page
-from dashboard.views import FLOWS_PAGE, METHOD_PAGE, ZONE_PAGE, errors, replay
+from dashboard.views import (
+    FLOWS_PAGE,
+    METHOD_PAGE,
+    ZONE_PAGE,
+    energy,
+    errors,
+    replay,
+)
 from dashboard.views.common import (
     CHART_HEIGHT,
     Context,
@@ -482,5 +489,6 @@ def render(ctx: Context) -> None:
     pick_country(ctx)
     accuracy(ctx)
     four_puzzles(ctx.run)
+    energy.energy_mix(ctx)
     errors.error_patterns(ctx)
     call_to_action()
