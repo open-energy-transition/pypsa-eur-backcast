@@ -1086,6 +1086,20 @@
             }
           }
         },
+        "country_fuel_price": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "description": "Fuel price in EUR/MWh_th per carrier and country from a quoted ISO date until the next one, replacing the monthly price, e.g. `{coal: {PL: {\"2022-01-01\": 15.25}}}` for domestic coal sold to Polish power plants below the international price. The price is unchanged before the first date. Applied before the marginal cost and its spread are computed. Requires `dynamic_fuel_price` and `fuel_price_nominal`.",
+          "type": "object"
+        },
         "gas_price_cap": {
           "description": "Configuration for `conventional.gas_price_cap` settings.",
           "properties": {
@@ -12544,6 +12558,20 @@
               "type": "array"
             }
           }
+        },
+        "country_fuel_price": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "description": "Fuel price in EUR/MWh_th per carrier and country from a quoted ISO date until the next one, replacing the monthly price, e.g. `{coal: {PL: {\"2022-01-01\": 15.25}}}` for domestic coal sold to Polish power plants below the international price. The price is unchanged before the first date. Applied before the marginal cost and its spread are computed. Requires `dynamic_fuel_price` and `fuel_price_nominal`.",
+          "type": "object"
         },
         "gas_price_cap": {
           "description": "Configuration for `conventional.gas_price_cap` settings.",

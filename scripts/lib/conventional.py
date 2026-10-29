@@ -117,3 +117,15 @@ def cap_fuel_price(fuel_price: pd.DataFrame, cap: dict[str, float]) -> pd.DataFr
     steps = pd.Series(cap, dtype=float).rename(index=pd.Timestamp).sort_index()
     limit = steps.reindex(fuel_price.index, method="ffill").fillna(np.inf)
     return fuel_price.clip(upper=limit, axis=0)
+
+
+def step_fuel_price(fuel_price: pd.DataFrame, price: dict[str, float]) -> pd.DataFrame:
+    """Set the fuel price per snapshot to the price in force since the latest ISO date in `price`, unchanged before the first date."""
+    steps = pd.Series(price, dtype=float).rename(index=pd.Timestamp).sort_index()
+    level = steps.reindex(fuel_price.index, method="ffill")
+    stepped = pd.DataFrame(
+        np.repeat(level.to_numpy()[:, None], fuel_price.shape[1], axis=1),
+        index=fuel_price.index,
+        columns=fuel_price.columns,
+    )
+    return stepped.fillna(fuel_price)

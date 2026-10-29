@@ -14,6 +14,7 @@ from scripts.lib.conventional import (
     cap_fuel_price,
     clip_p_min_pu,
     spread_marginal_cost,
+    step_fuel_price,
 )
 from scripts.lib.validation.config.conventional import ConventionalConfig
 
@@ -160,6 +161,64 @@ def test_cap_fuel_price(cap, expected):
     np.testing.assert_allclose(result.b, 40.0)
 
 
+@pytest.mark.parametrize(
+    "price, expected",
+    [
+        (CAP, [60.0, 50.0, 70.0]),
+        ({"2023-01-01": 15.0}, [15.0, 15.0, 15.0]),
+        ({"2023-02-01": 15.0}, [60.0, 60.0, 60.0]),
+    ],
+    ids=["steps", "before-snapshots", "after-snapshots"],
+)
+def test_step_fuel_price(price, expected):
+    fuel_price = pd.DataFrame({"a": 60.0, "b": 60.0}, index=DAYS)
+    result = step_fuel_price(fuel_price, price)
+    for column in ["a", "b"]:
+        np.testing.assert_allclose(result[column], expected)
+
+
+def test_country_fuel_price():
+    n = pypsa.Network()
+    n.set_snapshots(DAYS)
+    n.add("Bus", ["PL00", "DE00"], country=["PL", "DE"])
+    costs = pd.DataFrame(
+        {"fuel": 0.0, "VOM": 0.0, "CO2 intensity": 0.0}, index=["CCGT", "coal"]
+    )
+    ppl = pd.DataFrame(
+        {
+            "carrier": ["coal", "coal", "CCGT"],
+            "bus": ["PL00", "DE00", "PL00"],
+            "p_nom": 100.0,
+            "efficiency": 0.5,
+            "marginal_cost": 0.0,
+            "capital_cost": 0.0,
+            "build_year": 2000,
+            "lifetime": 50.0,
+        },
+        index=["PL coal", "DE coal", "PL CCGT"],
+    )
+    fuel_price = pd.DataFrame({"gas": 60.0, "coal": 40.0}, index=DAYS)
+    params = {
+        "gas_price_cap": {"enable": False},
+        "country_fuel_price": {"coal": {"PL": {"2023-01-14": 15.0}}},
+    }
+    attach_conventional_generators(
+        n,
+        costs,
+        ppl,
+        ["CCGT", "coal"],
+        {"Generator": []},
+        set(),
+        params,
+        {},
+        fuel_price=fuel_price,
+    )
+    marginal_cost = n.generators_t.marginal_cost
+    np.testing.assert_allclose(marginal_cost["PL coal"], [80.0, 30.0, 30.0])
+    np.testing.assert_allclose(marginal_cost["DE coal"], 80.0)
+    np.testing.assert_allclose(marginal_cost["PL CCGT"], 120.0)
+
+
 def test_gas_price_cap_before_spread():
     n = pypsa.Network()
     n.set_snapshots(DAYS)
@@ -213,6 +272,20 @@ def test_gas_price_cap_before_spread():
     ids=["no-countries", "no-cap", "invalid-date", "negative", "static-fuel-price"],
 )
 def test_conventional_config_rejects_invalid_gas_price_cap(config):
+    with pytest.raises(ValidationError):
+        ConventionalConfig(**config)
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"country_fuel_price": {"coal": {"PL": {"2022": 15.0}}}},
+        {"country_fuel_price": {"coal": {"PL": {"2022-01-01": -1.0}}}},
+        {"dynamic_fuel_price": True, "country_fuel_price": {"coal": {"PL": {"2022-01-01": 15.0}}}},
+    ],
+    ids=["invalid-date", "negative", "real-fuel-price"],
+)
+def test_conventional_config_rejects_invalid_country_fuel_price(config):
     with pytest.raises(ValidationError):
         ConventionalConfig(**config)
 

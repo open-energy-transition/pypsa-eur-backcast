@@ -468,6 +468,7 @@ conventional:
     utilisation: 0.35
     reference: nameplate
     exclude_areas: []
+  country_fuel_price: {}
   gas_price_cap:
     enable: false
     countries: []
