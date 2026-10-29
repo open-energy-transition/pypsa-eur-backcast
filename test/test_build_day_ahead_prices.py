@@ -12,6 +12,9 @@ from entsoe.mappings import Area
 
 from scripts.build_day_ahead_prices import (
     map_areas_to_buses,
+    read_exchange_rates,
+    read_prices,
+    to_eur,
     to_hourly_utc,
 )
 from scripts.lib.entsoe import read_area_to_bus
@@ -129,3 +132,53 @@ def test_fill_short_gaps(values, by_area, expected):
             prices, max_interpolate=3, max_gap=4, max_gap_by_column=by_area
         )
         np.testing.assert_array_equal(result["DE_LU"], expected)
+
+
+@pytest.fixture
+def rates(tmp_path):
+    path = tmp_path / "eurofxref-hist.csv"
+    path.write_text(
+        "Date,PLN,BGN,\n"
+        "2019-01-07,4.0,1.95583,\n"
+        "2019-01-04,5.0,1.95583,\n"
+        "2019-01-03,N/A,1.95583,\n"
+    )
+    return read_exchange_rates(path)
+
+
+def test_to_eur_uses_rate_of_day_or_last_before(rates):
+    index = pd.date_range("2019-01-04 22:00", "2019-01-07 01:00", freq="h")
+    prices = pd.Series(100.0, index, name="PL")
+
+    result = to_eur(prices, "PLN", rates)
+
+    expected = np.where(index < "2019-01-07", 100 / 5.0, 100 / 4.0)
+    np.testing.assert_allclose(result, expected)
+    assert result.name == "PL"
+
+
+def test_to_eur_keeps_eur_and_raises_without_rate(rates):
+    prices = pd.Series(1.0, pd.date_range("2019-01-03", periods=2, freq="h"))
+
+    assert to_eur(prices, "EUR", rates) is prices
+    with pytest.raises(AssertionError, match="No ECB PLN rate"):
+        to_eur(prices, "PLN", rates)
+    np.testing.assert_allclose(to_eur(prices, "BGN", rates), 1 / 1.95583)
+
+
+@pytest.mark.parametrize(
+    "content, currency",
+    [
+        ("utc_timestamp,PL,currency\n2019-01-01 00:00:00+00:00,200.0,PLN\n", "PLN"),
+        ("utc_timestamp,DE_LU\n2019-01-01 00:00:00+00:00,50.0\n", "EUR"),
+    ],
+    ids=["currency", "legacy"],
+)
+def test_read_prices(tmp_path, content, currency):
+    path = tmp_path / "prices.csv"
+    path.write_text(content)
+
+    prices, result = read_prices(path)
+
+    assert result == currency and isinstance(prices, pd.Series)
+    assert prices.index.tz is not None
