@@ -86,6 +86,48 @@ backcast-2019-plain:  # unrefined 2019 reference: 2019 without the hydro, must-r
     hybrid_capacities:
       enable: false
 
+backcast-2022:
+  snapshots:
+    start: "2022-01-01"
+    end: "2023-01-01"
+
+  atlite:
+    default_cutout: europe-2022-sarah3-era5
+
+  electricity:
+    powerplants_filter: "(DateOut >= 2022 or DateOut != DateOut) and (DateIn <= 2022 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen'])"
+    custom_powerplants: "Country == 'NL' and (DateOut >= 2022 or DateOut != DateOut) and (DateIn <= 2022 or DateIn != DateIn)"
+    estimate_renewable_capacities:
+      year: 2022
+
+  conventional:
+    estimate_efficiencies:
+      reference_year: 2022
+    gas_price_cap:  # Iberian exception, Real Decreto-ley 10/2022: 40 EUR/MWh from 2022-06-15 for six months, then 5 EUR/MWh more per month
+      enable: true
+      countries: [ES, PT]
+      cap:
+        "2022-06-15": 40
+        "2022-12-14": 45
+
+  backcast:
+    exclude_price_areas: [AL, BA, BG, GB, ME, MK, XK]  # BG day-ahead prices are published partly in BGN in 2022
+    fixed_border_capacities:
+      BG-MK: physical  # no ENTSO-E capacity data before 2022-06-15
+      DK_1-GB: 0
+      HU-SI: 0  # no ENTSO-E capacity or exchange data before Core flow-based market coupling on 2022-06-08
+      IT_CALA-IT_CSUD: physical
+    exchange_proxy_fallback: true  # Core NTCs end with flow-based market coupling on 2022-06-08, EE-FI, EE-LV and HU-RO offered capacities have gaps of 8 to 16 days
+    exclude_generation_areas: [AL, GB]
+    wind_calibration_exclude:
+      IT_CALA: [onwind]
+      RS: [onwind]  # factor 2.93, ENTSO-E RS wind generation is published only from 2022-03
+    wind_calibration_factor_bounds: [0.35, 2.0]
+    wind_target_twh:
+      GB: {onwind: 31.8, offwind: 45.1}  # DESNZ ET 6.1 (Sep 2026) UK minus NI wind 3.26 TWh (DfE NI renewable generation statistics 2022: 3825 GWh, 85.3 % wind)
+    wind_curtailment_twh:
+      DE_LU: {onwind: 3.2, offwind: 4.2}  # BNetzA Bericht Netzengpassmanagement Gesamtjahr 2022, Tabelle 7: onshore 3186 GWh, offshore 4153 GWh
+
 backcast-2023:
   snapshots:
     start: "2023-01-01"
