@@ -192,6 +192,11 @@ backcast-2022:
     estimate_renewable_capacities:
       year: 2022
 
+  renewable:
+    hydro:
+      # With a cyclic one-year horizon the model moves reservoir water into the August gas price spike (FR Aug 3.9 TWh against 2.3 in ENTSO-E, NO_2 3.4 against 1.8), while operators held it for winter 2022/23, whose forward prices were higher still. Dispatch is capped at the mean inflow rate.
+      flatten_dispatch_buffer: 0.0
+
   conventional:
     estimate_efficiencies:
       reference_year: 2022
@@ -201,6 +206,13 @@ backcast-2022:
       cap:
         "2022-06-15": 40
         "2022-12-14": 45
+    # The World Bank monthly TTF overstates October and November 2022 (126 and 116 EUR/MWh against THE day-ahead means of 83 and 93) and misses the late-August spike to 311.
+    daily_gas_price:
+      enable: true
+      default_hub: THE
+      hubs:
+        ES: MIBGAS
+        PT: MIBGAS
 
   backcast:
     exclude_price_areas: [AL, BA, BG, GB, ME, MK, XK]  # BG day-ahead prices are published partly in BGN in 2022
