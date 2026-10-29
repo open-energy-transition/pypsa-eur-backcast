@@ -60,6 +60,23 @@ class HybridCapacitiesConfig(ConfigModel):
     )
 
 
+class UnavailabilityConfig(ConfigModel):
+    """Configuration for `backcast.unavailability` settings."""
+
+    enable: bool = Field(
+        False,
+        description="Set the availability (`p_max_pu`) of the generators of the `carriers` per bus to one minus the hourly unavailable share of their capacity from the unavailability of generation and production units published on the ENTSO-E Transparency Platform (planned and forced outages). The production units are matched to powerplantmatching by EIC code, nuclear units without one by name and capacity. The availability replaces `monthly_nuclear_availability` in areas with enough nuclear outage data (`min_coverage`). Nuclear generators of areas in `nuclear_phase_out` get zero availability after their last operating date. Requires `foresight: overnight`.",
+    )
+    carriers: list[str] = Field(
+        default_factory=lambda: ["CCGT", "OCGT", "coal", "lignite", "oil"],
+        description="Generator carriers whose availability is set from the outage data. Nuclear is left out by default, since outages miss units closed during the year, capacity without reported outages and modulation, so its availability is overstated.",
+    )
+    min_coverage: dict[str, Annotated[float, Field(ge=0, le=1)]] = Field(
+        default_factory=lambda: {"nuclear": 0.9},
+        description="Minimum share of the capacity of a carrier in an ENTSO-E area matched to production units with outage data, below which the generators keep their availability, e.g. the monthly nuclear availability. Zero for carriers not given.",
+    )
+
+
 class BackcastConfig(ConfigModel):
     """Configuration for `backcast` settings."""
 
@@ -150,6 +167,10 @@ class BackcastConfig(ConfigModel):
     hybrid_capacities: HybridCapacitiesConfig = Field(
         default_factory=HybridCapacitiesConfig,
         description="Raise cross-border capacities from proxy sources to a share of the physical transmission capacity, used with `electricity: cross_border_capacities: ntc`.",
+    )
+    unavailability: UnavailabilityConfig = Field(
+        default_factory=UnavailabilityConfig,
+        description="Thermal availability from the ENTSO-E unavailability of generation and production units.",
     )
 
     @field_validator("fixed_border_capacities", "exchange_proxy_borders")

@@ -483,7 +483,15 @@ availability. Wind calibration factors outside
 `wind_calibration_factor_bounds` raise an error, implausible carriers of an
 area are skipped via `wind_calibration_exclude`, e.g. `NL: [onwind]`. With
 `hybrid_capacities`, cross-border capacities from proxy sources are raised to a
-share of the physical transmission capacity in [compose_network][]. The rule
+share of the physical transmission capacity in [compose_network][]. With
+`unavailability: enable`, the planned and forced outages of generation and
+production units of all modelled bidding zones are retrieved from the ENTSO-E
+Transparency Platform and matched to the power plants ([build_unavailability][]).
+The availability of the fossil generators of each bus and carrier is then one
+minus the unavailable share of their capacity. With `nuclear` added to
+`carriers`, it also replaces the monthly nuclear availability where at least
+`min_coverage` of the nuclear capacity of a bidding zone has outage data. The
+rule
 [evaluate_price_backcast][] compares the modelled with the observed prices.
 
 {{ schema_table("backcast") }}

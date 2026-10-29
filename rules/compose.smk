@@ -28,8 +28,12 @@ def get_compose_inputs(w):
     )
     spread = cfg["conventional"]["marginal_cost_spread"]
     observed_spread = spread["enable"] and spread["reference"] == "observed"
+    unavailability = cfg["backcast"]["unavailability"]["enable"]
     needs_area_to_bus = (
-        elec["cross_border_capacities"] == "ntc" or calibrate or observed_spread
+        elec["cross_border_capacities"] == "ntc"
+        or calibrate
+        or observed_spread
+        or unavailability
     )
 
     # Electricity-only inputs (always included)
@@ -98,6 +102,10 @@ def get_compose_inputs(w):
         ),
         entsoe_generation=(
             resources("entsoe_generation_monthly.csv") if calibrate else []
+        ),
+        unavailability=resources("unavailability.csv") if unavailability else [],
+        unavailability_coverage=(
+            resources("unavailability_coverage.csv") if unavailability else []
         ),
         solar_rooftop_potentials=(
             resources("solar_rooftop_potentials.csv")
