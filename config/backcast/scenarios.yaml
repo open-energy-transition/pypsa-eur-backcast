@@ -192,11 +192,6 @@ backcast-2022:
     estimate_renewable_capacities:
       year: 2022
 
-  renewable:
-    hydro:
-      # With a cyclic one-year horizon the model moves reservoir water into the August gas price spike (FR Aug 3.9 TWh against 2.3 in ENTSO-E, NO_2 3.4 against 1.8), while operators held it for winter 2022/23, whose forward prices were higher still. Dispatch is capped at the mean inflow rate.
-      flatten_dispatch_buffer: 0.0
-
   conventional:
     estimate_efficiencies:
       reference_year: 2022
@@ -213,6 +208,10 @@ backcast-2022:
       hubs:
         ES: MIBGAS
         PT: MIBGAS
+    country_fuel_price:
+      coal:
+        PL:  # domestic steam coal for power plants, ARP/TGE PSCMI-1 2022 average 19.85 PLN/GJ (Bogdanka FY2022 results) at the ECB 2022 average of 4.6861 PLN/EUR, against about 37 EUR/MWh_th for the international price
+          "2022-01-01": 15.25
 
   backcast:
     exclude_price_areas: [AL, BA, BG, GB, ME, MK, XK]  # BG day-ahead prices are published partly in BGN in 2022
@@ -223,12 +222,15 @@ backcast-2022:
       IT_CALA-IT_CSUD: physical
     exchange_proxy_fallback: true  # Core NTCs end with flow-based market coupling on 2022-06-08, EE-FI, EE-LV and HU-RO offered capacities have gaps of 8 to 16 days
     exclude_generation_areas: [AL, GB]
-    monthly_availability_carriers: [coal, lignite, biomass, waste]  # with gas at 100-340 EUR/MWh these run at full availability in the model; without calibration coal fills the gap left by the other three, e.g. Jul-Sep 110 TWh lignite and 45 TWh biomass against 67 and 19 TWh in ENTSO-E
-    monthly_availability_exclude:  # the Baltic-Nordic pool's smaller thermal fleets act as flexible swing or CHP capacity; flattening them to the monthly mean removes their ramp-up for tight hours and spikes prices across the hydro-coupled pool instead
-      coal: [PL, FI, EE, LV, LT, SE_1, SE_2, SE_3, SE_4]  # PL coal is already near its physical ceiling (annual CF 0.55, peak/p_nom 0.98) and used as a swing exporter to the pool
-      lignite: [FI, EE, LV, LT, SE_1, SE_2, SE_3, SE_4]
-      biomass: [FI, EE, LV, LT, SE_1, SE_2, SE_3, SE_4]  # FI's 4.1 GW biomass CHP fleet runs at CF 0.17-0.26, heat-driven and seasonal, not monthly-flat
-      waste: [FI, EE, LV, LT, SE_1, SE_2, SE_3, SE_4]
+    monthly_availability_carriers: [coal, lignite, biomass, waste]  # with gas at 100-340 EUR/MWh these ran at full availability in the model and displaced gas, e.g. Jul-Sep 110 TWh lignite and 45 TWh biomass against 67 and 19 TWh in ENTSO-E
+    # ENTSO-E misses 6.6-9.3 % of the load in these countries (load - generation - net scheduled imports, 2022):
+    # FI 5.3 TWh (peat and other CHP), SE 11.2 (no CHP category), PL 11.8 (industrial autoproducers), DK 2.9 (decentralised CHP), LV 0.6.
+    # Their thermal fleets keep their availability, as calibrating to the published generation would drop real output.
+    monthly_availability_exclude:
+      coal: &incomplete-thermal [FI, SE_1, SE_2, SE_3, SE_4, PL, DK_1, DK_2, LV]
+      lignite: *incomplete-thermal
+      biomass: *incomplete-thermal
+      waste: *incomplete-thermal
     wind_calibration_exclude:
       IT_CALA: [onwind]
       RS: [onwind]  # factor 2.93, ENTSO-E RS wind generation is published only from 2022-03
