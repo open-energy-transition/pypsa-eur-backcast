@@ -72,7 +72,8 @@ def apply_backcast(
     ntc = electricity["cross_border_capacities"] == "ntc"
     wind = backcast["calibrate_wind"]
     nuclear = backcast["monthly_nuclear_availability"]
-    if not (ntc or wind or nuclear):
+    carriers = backcast["monthly_availability_carriers"]
+    if not (ntc or wind or nuclear or carriers):
         return
     area_to_bus = read_area_to_bus(inputs.area_to_bus)
     if ntc:
@@ -92,7 +93,7 @@ def apply_backcast(
                 hybrid["areas"],
             )
         apply_cross_border_capacities(n, capacities, area_to_bus)
-    if wind or nuclear:
+    if wind or nuclear or carriers:
         generation = read_generation(inputs.entsoe_generation)
     if wind:
         calibrate_wind(
@@ -112,6 +113,17 @@ def apply_backcast(
             "nuclear",
             backcast["nuclear_area_map"],
             backcast["nuclear_phase_out"],
+        )
+    for carrier in carriers:
+        apply_monthly_availability(
+            n,
+            generation,
+            area_to_bus,
+            carrier,
+            {},
+            {},
+            keep_unpublished=True,
+            exclude=backcast["monthly_availability_exclude"].get(carrier, []),
         )
 
 

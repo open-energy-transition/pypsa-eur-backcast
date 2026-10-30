@@ -468,6 +468,7 @@ conventional:
     utilisation: 0.35
     reference: nameplate
     exclude_areas: []
+  country_fuel_price: {}
   gas_price_cap:
     enable: false
     countries: []
@@ -578,6 +579,8 @@ backcast:
   wind_curtailment_twh: {}
   wind_target_twh: {}
   monthly_nuclear_availability: false
+  monthly_availability_carriers: []
+  monthly_availability_exclude: {}
   nuclear_area_map: {}
   nuclear_phase_out: {}
   exclude_generation_areas: []
