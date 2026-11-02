@@ -684,7 +684,9 @@ def attach_conventional_generators(
                 f"Capped the gas price of {len(capped)} generators in "
                 f"{gas_cap['countries']}."
             )
-        for carrier, prices in conventional_params.get("country_fuel_price", {}).items():
+        for carrier, prices in conventional_params.get(
+            "country_fuel_price", {}
+        ).items():
             for country, price in prices.items():
                 selected = ppl.index[ppl.carrier.eq(carrier) & countries.eq(country)]
                 assert not selected.empty, (
@@ -1339,7 +1341,9 @@ def main(
 
     if params.conventional["daily_gas_price"]["enable"]:
         gas_price = pd.read_csv(inputs.gas_price, index_col=0, parse_dates=True)
-        assert n.snapshots.isin(gas_price.index).all(), "Daily gas prices miss snapshots."
+        assert n.snapshots.isin(gas_price.index).all(), (
+            "Daily gas prices miss snapshots."
+        )
         gas_price = gas_price.reindex(n.snapshots)
     else:
         gas_price = None
