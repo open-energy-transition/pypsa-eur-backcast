@@ -572,6 +572,7 @@ backcast:
   fixed_border_capacities: {}
   exchange_proxy_borders: []
   exchange_proxy_fallback: false
+  exchange_proxy_by_direction_areas: []
   calibrate_wind: false
   wind_calibration_exclude: {}
   wind_calibration_factor_bounds:
