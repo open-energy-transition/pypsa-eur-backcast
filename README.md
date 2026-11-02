@@ -86,7 +86,7 @@ gh release upload dashboard-data dashboard-cache.tar.gz --clobber -R open-energy
 
 Then reboot the app in the Streamlit Community Cloud settings: a running app keeps its downloaded data.
 Every run in `dashboard/cache/` is published, so remove local runs you do not want to share before packing.
-Publish only years merged into `master` (currently 2019, 2020, 2021, 2023 and 2024), each extracted from a run of `master`.
+Publish only years merged into `master` (currently 2019 to 2024), each extracted from a run of `master`.
 The app opens on `backcast-2023`, the year the refinements were tuned on; the other cached years are shown beside it over the same period.
 
 ## Known limitations and open items
