@@ -346,7 +346,7 @@ def puzzles(run: RunData) -> list[Puzzle]:
     tables = puzzle_tables(run.area_model, run.area_observed)
     spikes, negative, cheap = tables["spikes"], tables["negative"], tables["cheap"]
     spike_zone, cheap_zone = spikes.index[0], cheap.index[0]
-    numbers = summary(run)
+    numbers = summary(run, run.flows)
     export, scheduled = numbers[EXPORT_MODEL], numbers[EXPORT_SCHEDULED]
     shares = negative.loc[FOCUS_AREA]
     return [
