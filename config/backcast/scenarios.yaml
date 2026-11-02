@@ -351,11 +351,12 @@ backcast-2025:
     exclude_price_areas: [AL, BA, GB, ME, MK, XK]
     fixed_border_capacities:
       IT_CALA-IT_CSUD: physical
-    exchange_proxy_fallback: true
+    exchange_proxy_fallback: true  # no Nordic capacities are published in 2025 (flow-based market coupling since 2024-10-29), the DE_LU-DK_2 NTC ends in 2024
+    exchange_proxy_by_direction_areas: [DK_1, DK_2, FI, NO_1, NO_2, NO_3, NO_4, NO_5, SE_1, SE_2, SE_3, SE_4]  # Nordic flow-based region
     exclude_generation_areas: [AL, GB]
     wind_calibration_exclude:
       IT_CALA: [onwind]
-    wind_calibration_factor_bounds: [0.3, 2.0]
+    wind_calibration_factor_bounds: [0.3, 2.1]  # AT onwind needs 2.06 (2020: 2.02), DK_2 onwind is low in every year (2024: 0.34)
     wind_target_twh:
       # DESNZ DUKES 2026 Table 6.2 UK onshore 34.42, offshore 52.02 TWh, minus NI wind 2.76 TWh. The old metered DfE NI series ends in
       # 2025-09: Jan-Sep 1895 GWh plus Oct-Dec 921 GWh of the new consumption basis times 0.94, the old to new ratio of Jan-Sep.
