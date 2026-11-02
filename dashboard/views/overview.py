@@ -274,7 +274,7 @@ def big_numbers(ctx: Context) -> None:
         )
     caption = f"{ctx.run.name}, {ctx.period}."
     if others:
-        caption += f" Other years, {ctx.references[0].period}: {'; '.join(others)}."
+        caption += f" Other years, same period: {'; '.join(others)}."
     st.caption(caption)
 
 
