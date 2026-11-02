@@ -615,7 +615,7 @@ def attach_conventional_generators(
         DataFrame containing fuel price data, by default None.
     gas_price : pd.DataFrame, optional
         Gas price per snapshot and hub, replacing the gas price of
-        `fuel_price` for CCGT and OCGT, by default None.
+        `fuel_price` for CCGT and OCGT where it is given, by default None.
     """
     if ppl.empty:
         return
@@ -662,7 +662,10 @@ def attach_conventional_generators(
                 hub = hub.fillna(daily["default_hub"])
             # Without a default hub, generators outside `hubs` keep the monthly price.
             hub = hub.dropna()
-            fuel_price[hub.index] = gas_price[hub].to_numpy()
+            # Hours before a hub publishes daily prices keep the monthly price.
+            fuel_price[hub.index] = fuel_price[hub.index].where(
+                gas_price[hub].isna().to_numpy(), gas_price[hub].to_numpy()
+            )
             logger.info(
                 f"Set the daily gas price of {len(hub)} of {len(gas)} gas generators from the hubs "
                 f"{hub.value_counts().to_dict()}."
@@ -1336,8 +1339,8 @@ def main(
 
     if params.conventional["daily_gas_price"]["enable"]:
         gas_price = pd.read_csv(inputs.gas_price, index_col=0, parse_dates=True)
+        assert n.snapshots.isin(gas_price.index).all(), "Daily gas prices miss snapshots."
         gas_price = gas_price.reindex(n.snapshots)
-        assert gas_price.notna().all().all(), "Daily gas prices miss snapshots."
     else:
         gas_price = None
 

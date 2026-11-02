@@ -91,3 +91,14 @@ def test_hourly_gas_price_fills_only_the_previous_gas_day():
 
     with pytest.raises(AssertionError, match="2023-01-02"):
         hourly_gas_price(daily.iloc[:1], snapshots)
+
+
+def test_hourly_gas_price_is_empty_before_the_first_published_gas_day():
+    snapshots = pd.date_range("2021-09-30", "2021-10-01 23:00", freq="h")
+    daily = pd.Series([80.0], index=pd.to_datetime(["2021-10-01"]))
+    price = hourly_gas_price(daily, snapshots, pd.Timestamp("2021-10-01"))
+    assert price.loc[:"2021-10-01 03:00"].isna().all()
+    np.testing.assert_allclose(price.loc["2021-10-01 04:00":], 80.0)
+
+    with pytest.raises(AssertionError, match="2021-10-01"):
+        hourly_gas_price(daily.iloc[:0], snapshots, pd.Timestamp("2021-10-01"))
