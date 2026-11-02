@@ -114,13 +114,13 @@ def kpi_text(values: dict[str, float]) -> str:
 
 
 def lead(ctx: Context, buses: pd.DataFrame, metrics: pd.DataFrame) -> str:
-    """Summarise the quality of the run, the validation runs over the comparable period and the worst zones."""
+    """Summarise the quality of the run, the runs of other years over the comparable period and the worst zones."""
     text = (
         f"Median over **{len(buses)} model regions** ({len(metrics)} bidding zones), "
         f"{ctx.period}: {kpi_text(kpis(buses))}."
     )
     for ref in ctx.references:
-        text += f" Validation, {ref.period}: {kpi_text(kpis(ref.bus_metrics()))}."
+        text += f" {ref.run.year}, {ref.period}: {kpi_text(kpis(ref.bus_metrics()))}."
     return (
         f"{text}\n\nLargest MAE: {worst(metrics.mae)} €/MWh. "
         f"Largest bias: {worst(metrics.mean_bias, signed=True)} €/MWh. "
@@ -248,7 +248,7 @@ def hero(ctx: Context, week: pd.DatetimeIndex) -> None:
 
 
 def big_numbers(ctx: Context) -> None:
-    """Draw zones covered, shape match and typical hourly miss of the period with the validation runs as caption."""
+    """Draw zones covered, shape match and typical hourly miss of the period with the other years as caption."""
     values = kpis(ctx.bus_metrics())
     zones, shape, gap = st.columns(3)
     zones.metric(
@@ -266,14 +266,16 @@ def big_numbers(ctx: Context) -> None:
         f"{values['MAE']:.1f} €/MWh",
         help="Mean absolute error, median over the model regions: the average gap between model and market price.",
     )
-    notes = [f"{ctx.run.name}, {ctx.period}."]
+    others = []
     for ref in ctx.references:
         checked = kpis(ref.bus_metrics())
-        notes.append(
-            f"Validation year {ref.run.year}, {ref.period}: shape match {checked['r']:.2f}, "
-            f"typical miss {checked['MAE']:.1f} €/MWh."
+        others.append(
+            f"{ref.run.year}: shape match {checked['r']:.2f}, typical miss {checked['MAE']:.1f} €/MWh"
         )
-    st.caption(" ".join(notes))
+    caption = f"{ctx.run.name}, {ctx.period}."
+    if others:
+        caption += f" Other years, same period: {'; '.join(others)}."
+    st.caption(caption)
 
 
 def pick_country(ctx: Context) -> None:
@@ -326,7 +328,7 @@ def accuracy(ctx: Context) -> None:
         st.markdown(lead(ctx, buses, metrics))
         kpi_row(f"{ctx.run.name}, {ctx.period}", buses)
         for ref in ctx.references:
-            kpi_row(f"validation {ref.run.name}, {ref.period}", ref.bus_metrics())
+            kpi_row(f"{ref.run.name}, {ref.period}", ref.bus_metrics())
     table = metrics[list(TABLE_COLUMNS)].rename(columns=TABLE_COLUMNS)
     shares = [c for c in table if "≤" in c]
     table[shares] *= 100
