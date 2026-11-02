@@ -13,7 +13,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from dashboard.data import RunData, area_metrics, bus_metrics
+from dashboard.data import RunData, RunPrices, area_metrics, bus_metrics
 from dashboard.narrative import NAMES
 from scripts.lib.backcast_plotting import (
     DIVERGING,
@@ -50,9 +50,9 @@ class Line:
 
 @dataclass(frozen=True)
 class Reference:
-    """Run of another year over the comparable period."""
+    """Prices of a run of another year over the comparable period."""
 
-    run: RunData
+    run: RunPrices
     hours: pd.DatetimeIndex
     period: str
 

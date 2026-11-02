@@ -51,19 +51,12 @@ KPIS = {
 
 
 @dataclass(frozen=True)
-class RunData:
-    """Extracted prices, dispatch and flows of one solved backcast run."""
+class RunPrices:
+    """Extracted model and observed prices of one solved backcast run, all a run of another year is compared on."""
 
     name: str
     model: pd.DataFrame
     observed: pd.DataFrame
-    load: pd.DataFrame
-    generation: pd.DataFrame
-    flows: pd.DataFrame
-    marginal: pd.DataFrame
-    metrics: pd.DataFrame
-    monthly_bias: pd.DataFrame
-    regions: dict
     area_to_bus: pd.Series
     manifest: dict
     buses: pd.Series = field(init=False)
@@ -93,26 +86,50 @@ class RunData:
         return select_weeks(self.area_observed.iloc[:, 0])
 
 
+@dataclass(frozen=True)
+class RunData(RunPrices):
+    """Extracted prices, dispatch and flows of one solved backcast run."""
+
+    load: pd.DataFrame
+    generation: pd.DataFrame
+    flows: pd.DataFrame
+    marginal: pd.DataFrame
+    metrics: pd.DataFrame
+    monthly_bias: pd.DataFrame
+    regions: dict
+
+
+def price_fields(path: Path) -> dict:
+    """Fields of the prices of a run read from its extract."""
+    prices = pd.read_parquet(path / "prices.parquet")
+    return dict(
+        name=path.name,
+        model=prices["model"],
+        observed=prices["observed"],
+        area_to_bus=pd.read_csv(path / "area_to_bus.csv", index_col="bus").iloc[:, 0],
+        manifest=json.loads((path / "manifest.json").read_text()),
+    )
+
+
+def load_prices(path: Path) -> RunPrices:
+    """Read the prices of a run without its dispatch and flows."""
+    return RunPrices(**price_fields(path))
+
+
 def load_run(path: Path) -> RunData:
     """Read the extract of a run."""
     frames = {
         name: pd.read_parquet(path / f"{name}.parquet")
-        for name in ["prices", "load", "generation", "flows", "marginal"]
+        for name in ["load", "generation", "flows", "marginal", "metrics"]
     }
-    frames["metrics"] = pd.read_parquet(path / "metrics.parquet")
     monthly = pd.read_parquet(path / "monthly_bias.parquet")
     frames["monthly_bias"] = monthly.set_axis(pd.PeriodIndex(monthly.index, freq="M"))
-    prices = frames.pop("prices")
     return RunData(
-        name=path.name,
-        model=prices["model"],
-        observed=prices["observed"],
+        **price_fields(path),
         regions=json.loads(
             (path / "regions.geojson").read_text(),
             parse_float=lambda x: round(float(x), COORDINATE_DIGITS),
         ),
-        area_to_bus=pd.read_csv(path / "area_to_bus.csv", index_col="bus").iloc[:, 0],
-        manifest=json.loads((path / "manifest.json").read_text()),
         **frames,
     )
 
@@ -280,11 +297,11 @@ def net_export(flows: pd.DataFrame, area: str, hours: pd.DatetimeIndex) -> pd.Se
     return series.reindex(["model", "scheduled"], fill_value=0.0)
 
 
-def summary(run: RunData) -> dict[str, float]:
-    """Headline numbers of a run over its whole year, medians over model regions."""
+def summary(run: RunPrices, flows: pd.DataFrame) -> dict[str, float]:
+    """Headline numbers of a run with its flows over its whole year, medians over model regions."""
     buses = bus_metrics(run.model, run.observed, run.observed.index)
     error = run.model - run.observed
-    export = net_export(run.flows, FOCUS_AREA, run.observed.index)
+    export = net_export(flows, FOCUS_AREA, run.observed.index)
     return {
         "year": run.year,
         "scored model regions": len(buses),

@@ -280,7 +280,7 @@ def test_story_spike_card_uses_how_it_works_median(run_dir):
 
     run = data.load_run(run_dir)
 
-    spike = plain_error(data.summary(run)[data.TOP_ERROR])
+    spike = plain_error(data.summary(run, run.flows)[data.TOP_ERROR])
     assert f"is {spike} (median over model regions)" in puzzles(run)[0].answer
 
 
@@ -333,15 +333,15 @@ def test_app_renders_pages_and_keeps_state(run_dir, monkeypatch, page):
 
 
 @pytest.mark.slow
-def test_story_scores_validation_run_over_same_period(validation_cache, monkeypatch):
+def test_story_scores_other_year_over_same_period(validation_cache, monkeypatch):
     app = app_test(
         validation_cache, monkeypatch, page=STORY_PAGE, run_a="test-run", period="March"
     )
 
     text = " ".join(m.value for m in app.markdown)
     assert not app.exception
-    assert "Validation, March 2019" in text
-    assert "validation test-run-2019, March 2019" in text
+    assert "2019, March 2019: MAE" in text
+    assert "**test-run-2019, March 2019**" in text
 
 
 @pytest.mark.slow
