@@ -42,7 +42,7 @@ from scripts._helpers import (
     rename_techs,
     update_p_nom_max,
 )
-from scripts.lib.conventional import cap_fuel_price
+from scripts.lib.conventional import cap_fuel_price, step_fuel_price
 
 if PYPSA_V1:
     pypsa.options.params.add.return_names = True
@@ -681,6 +681,16 @@ def attach_conventional_generators(
                 f"Capped the gas price of {len(capped)} generators in "
                 f"{gas_cap['countries']}."
             )
+        for carrier, prices in conventional_params.get("country_fuel_price", {}).items():
+            for country, price in prices.items():
+                selected = ppl.index[ppl.carrier.eq(carrier) & countries.eq(country)]
+                assert not selected.empty, (
+                    f"No {carrier} generators in {country} for conventional: country_fuel_price."
+                )
+                fuel_price[selected] = step_fuel_price(fuel_price[selected], price)
+                logger.info(
+                    f"Set the {carrier} price of {len(selected)} generators in {country}."
+                )
         marginal_cost = fuel_price.div(ppl.efficiency).add(ppl.carrier.map(costs.VOM))
     else:
         marginal_cost = ppl.marginal_cost
