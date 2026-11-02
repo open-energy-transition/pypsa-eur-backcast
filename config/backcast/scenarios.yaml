@@ -178,6 +178,68 @@ backcast-2021:
     wind_curtailment_twh:
       DE_LU: {onwind: 3.4, offwind: 2.1}  # BNetzA Bericht Netzengpassmanagement Gesamtes Jahr 2021, Tabelle 13: onshore 3408 GWh, offshore 2095 GWh
 
+backcast-2022:
+  snapshots:
+    start: "2022-01-01"
+    end: "2023-01-01"
+
+  atlite:
+    default_cutout: europe-2022-sarah3-era5
+
+  electricity:
+    powerplants_filter: "(DateOut >= 2022 or DateOut != DateOut) and (DateIn <= 2022 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen'])"
+    custom_powerplants: "Country == 'NL' and (DateOut >= 2022 or DateOut != DateOut) and (DateIn <= 2022 or DateIn != DateIn)"
+    estimate_renewable_capacities:
+      year: 2022
+
+  conventional:
+    estimate_efficiencies:
+      reference_year: 2022
+    gas_price_cap:  # Iberian exception, Real Decreto-ley 10/2022: 40 EUR/MWh from 2022-06-15 for six months, then 5 EUR/MWh more per month
+      enable: true
+      countries: [ES, PT]
+      cap:
+        "2022-06-15": 40
+        "2022-12-14": 45
+    # The World Bank monthly TTF overstates October and November 2022 (126 and 116 EUR/MWh against THE day-ahead means of 83 and 93) and misses the late-August spike to 311.
+    daily_gas_price:
+      enable: true
+      default_hub: THE
+      hubs:
+        ES: MIBGAS
+        PT: MIBGAS
+    country_fuel_price:
+      coal:
+        PL:  # domestic steam coal for power plants, ARP/TGE PSCMI-1 2022 average 19.85 PLN/GJ (Bogdanka FY2022 results) at the ECB 2022 average of 4.6861 PLN/EUR, against about 37 EUR/MWh_th for the international price
+          "2022-01-01": 15.25
+
+  backcast:
+    exclude_price_areas: [AL, BA, BG, GB, ME, MK, XK]  # BG day-ahead prices are published partly in BGN in 2022
+    fixed_border_capacities:
+      BG-MK: physical  # no ENTSO-E capacity data before 2022-06-15
+      DK_1-GB: 0
+      HU-SI: 0  # no ENTSO-E capacity or exchange data before Core flow-based market coupling on 2022-06-08
+      IT_CALA-IT_CSUD: physical
+    exchange_proxy_fallback: true  # Core NTCs end with flow-based market coupling on 2022-06-08, EE-FI, EE-LV and HU-RO offered capacities have gaps of 8 to 16 days
+    exclude_generation_areas: [AL, GB]
+    monthly_availability_carriers: [coal, lignite, biomass, waste]  # with gas at 100-340 EUR/MWh these ran at full availability in the model and displaced gas, e.g. Jul-Sep 110 TWh lignite and 45 TWh biomass against 67 and 19 TWh in ENTSO-E
+    # ENTSO-E misses 6.6-9.3 % of the load in these countries (load - generation - net scheduled imports, 2022):
+    # FI 5.3 TWh (peat and other CHP), SE 11.2 (no CHP category), PL 11.8 (industrial autoproducers), DK 2.9 (decentralised CHP), LV 0.6.
+    # Their thermal fleets keep their availability, as calibrating to the published generation would drop real output.
+    monthly_availability_exclude:
+      coal: &incomplete-thermal [FI, SE_1, SE_2, SE_3, SE_4, PL, DK_1, DK_2, LV]
+      lignite: *incomplete-thermal
+      biomass: *incomplete-thermal
+      waste: *incomplete-thermal
+    wind_calibration_exclude:
+      IT_CALA: [onwind]
+      RS: [onwind]  # factor 2.93, ENTSO-E RS wind generation is published only from 2022-03
+    wind_calibration_factor_bounds: [0.35, 2.0]
+    wind_target_twh:
+      GB: {onwind: 31.8, offwind: 45.1}  # DESNZ ET 6.1 (Sep 2026) UK minus NI wind 3.26 TWh (DfE NI renewable generation statistics 2022: 3825 GWh, 85.3 % wind)
+    wind_curtailment_twh:
+      DE_LU: {onwind: 3.2, offwind: 4.2}  # BNetzA Bericht Netzengpassmanagement Gesamtjahr 2022, Tabelle 7: onshore 3186 GWh, offshore 4153 GWh
+
 backcast-2023:
   snapshots:
     start: "2023-01-01"
