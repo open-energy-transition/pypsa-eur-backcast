@@ -36,6 +36,7 @@ PERIODS = ["year", *MONTH_NAMES, "winter week", "summer week", "custom"]
 AGGREGATIONS = {"hourly": None, "daily": "D"}
 TOP_SHARE = 0.05
 FOCUS_AREA = "DE_LU"
+MAIN_RUN = "backcast-2023"  # the year the refinements were tuned on, shown first
 TOP_ERROR = f"error in top {TOP_SHARE:.0%} hours (€/MWh)"
 EXPORT_MODEL = f"{FOCUS_AREA} net export model (TWh)"
 EXPORT_SCHEDULED = f"{FOCUS_AREA} net export scheduled (TWh)"

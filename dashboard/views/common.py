@@ -50,7 +50,7 @@ class Line:
 
 @dataclass(frozen=True)
 class Reference:
-    """Validation run of another year over the comparable period."""
+    """Run of another year over the comparable period."""
 
     run: RunData
     hours: pd.DatetimeIndex

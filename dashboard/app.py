@@ -86,7 +86,7 @@ def period_hours(
 def reference(
     run: data.RunData, dates: tuple[pd.Timestamp, pd.Timestamp] | None
 ) -> Reference:
-    """Validation run over the same period preset, custom dates moved to its year."""
+    """Run of another year over the same period preset, custom dates moved to its year."""
     moved = None if dates is None else tuple(d.replace(year=run.year) for d in dates)
     hours = period_hours(run, moved)
     return Reference(run, hours, period_label(st.session_state.period, hours))
@@ -98,7 +98,7 @@ def normalise(runs: list[str]) -> data.RunData:
     if state.page not in PAGES:
         state.page = PAGES[0]
     if state.run_a not in runs:
-        state.run_a = runs[-1]
+        state.run_a = data.MAIN_RUN if data.MAIN_RUN in runs else runs[-1]
     run = cached_run(state.run_a)
     areas = list(run.buses.index)
     if state.area not in areas:

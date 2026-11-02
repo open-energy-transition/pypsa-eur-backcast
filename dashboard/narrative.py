@@ -138,8 +138,8 @@ LINKS = {
 WHAT = """
 The backcast replays a past year hour by hour. It asks one question: if every power plant offered its power at
 its fuel and CO2 cost, which day-ahead price would each bidding zone have seen? It compares that price with the
-real one, as published on ENTSO-E, the data platform of Europe's grid operators. The validation year, if cached,
-checks that improvements are not tuned to one year.
+real one, as published on ENTSO-E, the data platform of Europe's grid operators. The other years, all run with
+the same model, check that improvements are not tuned to one year.
 """
 
 HOW = """
