@@ -141,6 +141,10 @@ class _EstimateRenewableCapacitiesConfig(BaseModel):
         2024,
         description="Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
     )
+    irenastat_source: Literal["powerplantmatching", "retrieve"] = Field(
+        "powerplantmatching",
+        description="Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+    )
     expansion_limit: float | bool = Field(
         False,
         description="Artificially limit maximum IRENA capacities to a factor. For example, an `expansion_limit: 1.1` means 110% of capacities. If false are chosen, the estimated renewable potentials determine by the workflow are used.",

@@ -1596,6 +1596,26 @@
             }
           }
         },
+        "irenastat_capacities": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
         "co2stop": {
           "description": "Configuration for a single data source.",
           "properties": {
@@ -2913,6 +2933,15 @@
               "default": 2024,
               "description": "Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
               "type": "integer"
+            },
+            "irenastat_source": {
+              "default": "powerplantmatching",
+              "description": "Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+              "enum": [
+                "powerplantmatching",
+                "retrieve"
+              ],
+              "type": "string"
             },
             "expansion_limit": {
               "anyOf": [
@@ -8483,6 +8512,15 @@
           "description": "Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
           "type": "integer"
         },
+        "irenastat_source": {
+          "default": "powerplantmatching",
+          "description": "Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+          "enum": [
+            "powerplantmatching",
+            "retrieve"
+          ],
+          "type": "string"
+        },
         "expansion_limit": {
           "anyOf": [
             {
@@ -11109,6 +11147,15 @@
               "default": 2024,
               "description": "Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
               "type": "integer"
+            },
+            "irenastat_source": {
+              "default": "powerplantmatching",
+              "description": "Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+              "enum": [
+                "powerplantmatching",
+                "retrieve"
+              ],
+              "type": "string"
             },
             "expansion_limit": {
               "anyOf": [
@@ -15877,6 +15924,26 @@
           }
         },
         "mibgas_gas_prices": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "irenastat_capacities": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {
