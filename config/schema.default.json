@@ -460,6 +460,13 @@
           "description": "Fill gaps longer than `max_capacity_gap_hours` in the ENTSO-E capacity source of a border direction with the monthly maximum of the day-ahead scheduled commercial exchanges over both directions instead of raising an error, used with `electricity: cross_border_capacities: ntc`. The source of such directions is recorded as `<source>+scheduled_exchange`. E.g. for the Nordic borders, whose offered capacities end with the start of flow-based market coupling on 2024-10-29.",
           "type": "boolean"
         },
+        "exchange_proxy_by_direction_areas": {
+          "description": "ENTSO-E areas whose borders with each other use the monthly maximum of the day-ahead scheduled commercial exchanges per direction as exchange proxy, instead of the maximum over both directions. As the exchanges are netted per hour, the proxy of a rarely used direction is low. E.g. for the Nordic flow-based region, where the maximum over both directions gives rarely used directions the capacity of the busy one.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "calibrate_wind": {
           "default": false,
           "description": "Scale the onshore and offshore wind availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual generation reported by the ENTSO-E Transparency Platform plus `wind_curtailment_twh`. Only months with actual generation of the carrier are compared. One factor per area and carrier, `p_max_pu` is clipped at 1. Wind carriers with capacity but without actual generation in an area that publishes generation, e.g. offshore wind in `IE_SEM`, get zero availability. Areas without published generation are scaled to `wind_target_twh` or keep their availability, as do carriers excluded in `wind_calibration_exclude`. Requires `foresight: overnight`.",
@@ -535,6 +542,23 @@
           "default": false,
           "description": "Set the nuclear availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` and month to the actual monthly capacity factor, i.e. the actual generation divided by the hours with data and the nuclear capacity of the area, clipped to [0, 1]. After the last operating date in `nuclear_phase_out` the availability is zero. Every month before it must have actual generation, otherwise an error is raised. Areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
           "type": "boolean"
+        },
+        "monthly_availability_carriers": {
+          "description": "Further generator carriers whose availability is set per ENTSO-E area and month to the actual capacity factor like `monthly_nuclear_availability`, e.g. `[lignite, biomass, waste]` when these run at full availability in the model but not in reality. Generators of areas without published generation of the carrier, e.g. biomass in `SE_3`, and areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "monthly_availability_exclude": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": "ENTSO-E areas per carrier of `monthly_availability_carriers` kept at their availability instead of the monthly capacity factor, e.g. `{coal: [PL]}` for a fleet used flexibly as a swing exporter, whose monthly mean capacity factor would wrongly flatten its hourly dispatch and distort the prices of its trading partners.",
+          "type": "object"
         },
         "nuclear_area_map": {
           "additionalProperties": {
@@ -1069,6 +1093,20 @@
             }
           }
         },
+        "country_fuel_price": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "description": "Fuel price in EUR/MWh_th per carrier and country from a quoted ISO date until the next one, replacing the monthly price, e.g. `{coal: {PL: {\"2022-01-01\": 15.25}}}` for domestic coal sold to Polish power plants below the international price. The price is unchanged before the first date. Applied before the marginal cost and its spread are computed. Requires `dynamic_fuel_price` and `fuel_price_nominal`.",
+          "type": "object"
+        },
         "gas_price_cap": {
           "description": "Configuration for `conventional.gas_price_cap` settings.",
           "properties": {
@@ -1566,6 +1604,26 @@
           }
         },
         "ecb_exchange_rates": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "irenastat_capacities": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {
@@ -2902,6 +2960,15 @@
               "default": 2024,
               "description": "Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
               "type": "integer"
+            },
+            "irenastat_source": {
+              "default": "powerplantmatching",
+              "description": "Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+              "enum": [
+                "powerplantmatching",
+                "retrieve"
+              ],
+              "type": "string"
             },
             "expansion_limit": {
               "anyOf": [
@@ -8472,6 +8539,15 @@
           "description": "Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
           "type": "integer"
         },
+        "irenastat_source": {
+          "default": "powerplantmatching",
+          "description": "Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+          "enum": [
+            "powerplantmatching",
+            "retrieve"
+          ],
+          "type": "string"
+        },
         "expansion_limit": {
           "anyOf": [
             {
@@ -11099,6 +11175,15 @@
               "description": "Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
               "type": "integer"
             },
+            "irenastat_source": {
+              "default": "powerplantmatching",
+              "description": "Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+              "enum": [
+                "powerplantmatching",
+                "retrieve"
+              ],
+              "type": "string"
+            },
             "expansion_limit": {
               "anyOf": [
                 {
@@ -12548,6 +12633,20 @@
             }
           }
         },
+        "country_fuel_price": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "description": "Fuel price in EUR/MWh_th per carrier and country from a quoted ISO date until the next one, replacing the monthly price, e.g. `{coal: {PL: {\"2022-01-01\": 15.25}}}` for domestic coal sold to Polish power plants below the international price. The price is unchanged before the first date. Applied before the marginal cost and its spread are computed. Requires `dynamic_fuel_price` and `fuel_price_nominal`.",
+          "type": "object"
+        },
         "gas_price_cap": {
           "description": "Configuration for `conventional.gas_price_cap` settings.",
           "properties": {
@@ -13024,6 +13123,13 @@
           "description": "Fill gaps longer than `max_capacity_gap_hours` in the ENTSO-E capacity source of a border direction with the monthly maximum of the day-ahead scheduled commercial exchanges over both directions instead of raising an error, used with `electricity: cross_border_capacities: ntc`. The source of such directions is recorded as `<source>+scheduled_exchange`. E.g. for the Nordic borders, whose offered capacities end with the start of flow-based market coupling on 2024-10-29.",
           "type": "boolean"
         },
+        "exchange_proxy_by_direction_areas": {
+          "description": "ENTSO-E areas whose borders with each other use the monthly maximum of the day-ahead scheduled commercial exchanges per direction as exchange proxy, instead of the maximum over both directions. As the exchanges are netted per hour, the proxy of a rarely used direction is low. E.g. for the Nordic flow-based region, where the maximum over both directions gives rarely used directions the capacity of the busy one.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "calibrate_wind": {
           "default": false,
           "description": "Scale the onshore and offshore wind availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual generation reported by the ENTSO-E Transparency Platform plus `wind_curtailment_twh`. Only months with actual generation of the carrier are compared. One factor per area and carrier, `p_max_pu` is clipped at 1. Wind carriers with capacity but without actual generation in an area that publishes generation, e.g. offshore wind in `IE_SEM`, get zero availability. Areas without published generation are scaled to `wind_target_twh` or keep their availability, as do carriers excluded in `wind_calibration_exclude`. Requires `foresight: overnight`.",
@@ -13099,6 +13205,23 @@
           "default": false,
           "description": "Set the nuclear availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` and month to the actual monthly capacity factor, i.e. the actual generation divided by the hours with data and the nuclear capacity of the area, clipped to [0, 1]. After the last operating date in `nuclear_phase_out` the availability is zero. Every month before it must have actual generation, otherwise an error is raised. Areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
           "type": "boolean"
+        },
+        "monthly_availability_carriers": {
+          "description": "Further generator carriers whose availability is set per ENTSO-E area and month to the actual capacity factor like `monthly_nuclear_availability`, e.g. `[lignite, biomass, waste]` when these run at full availability in the model but not in reality. Generators of areas without published generation of the carrier, e.g. biomass in `SE_3`, and areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "monthly_availability_exclude": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": "ENTSO-E areas per carrier of `monthly_availability_carriers` kept at their availability instead of the monthly capacity factor, e.g. `{coal: [PL]}` for a fleet used flexibly as a swing exporter, whose monthly mean capacity factor would wrongly flatten its hourly dispatch and distort the prices of its trading partners.",
+          "type": "object"
         },
         "nuclear_area_map": {
           "additionalProperties": {
@@ -15855,6 +15978,26 @@
           }
         },
         "ecb_exchange_rates": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "irenastat_capacities": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {

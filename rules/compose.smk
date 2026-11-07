@@ -25,6 +25,7 @@ def get_compose_inputs(w):
     calibrate = (
         cfg["backcast"]["calibrate_wind"]
         or cfg["backcast"]["monthly_nuclear_availability"]
+        or cfg["backcast"]["monthly_availability_carriers"]
     )
     spread = cfg["conventional"]["marginal_cost_spread"]
     observed_spread = spread["enable"] and spread["reference"] == "observed"
@@ -49,6 +50,13 @@ def get_compose_inputs(w):
                 and elec["estimate_renewable_capacities"]["from_powerplantmatching"]
             )
             or (foresight != "overnight" and horizon == horizons[0])
+            else []
+        ),
+        irenastat_capacities=(
+            rules.retrieve_irenastat_capacities.output["csv"]
+            if elec["estimate_renewable_capacities"]["enable"]
+            and elec["estimate_renewable_capacities"]["from_irenastat"]
+            and elec["estimate_renewable_capacities"]["irenastat_source"] == "retrieve"
             else []
         ),
         hydro_capacities=ancient("data/hydro_capacities.csv"),

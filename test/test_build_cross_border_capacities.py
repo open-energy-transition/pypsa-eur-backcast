@@ -167,6 +167,32 @@ def test_area_capacities_exchange_proxy_fallback():
     assert info.loc["ES->FR", "source"] == "scheduled_exchange"
 
 
+def test_area_capacities_exchange_proxy_by_direction():
+    data = pd.concat(
+        [
+            retrieved("NO_1", "NO_3", scheduled_exchange=[3, 0, 0, 1]),
+            retrieved("NO_3", "NO_1", scheduled_exchange=[0, 2000, 2900, 0]),
+        ]
+    )
+
+    both, _ = area_capacities(
+        data, [("NO_1", "NO_3")], SNAPSHOTS, max_gap=1, exchange_proxy_borders=[]
+    )
+    by_direction, info = area_capacities(
+        data,
+        [("NO_1", "NO_3")],
+        SNAPSHOTS,
+        max_gap=1,
+        exchange_proxy_borders=[],
+        exchange_proxy_by_direction_areas=["NO_1", "NO_3"],
+    )
+
+    np.testing.assert_allclose(both["NO_1->NO_3"], [2000, 2000, 2900, 2900])
+    np.testing.assert_allclose(by_direction["NO_1->NO_3"], [3, 3, 1, 1])
+    np.testing.assert_allclose(by_direction["NO_3->NO_1"], [2000, 2000, 2900, 2900])
+    assert info.loc["NO_1->NO_3", "source"] == "scheduled_exchange"
+
+
 def test_area_capacities_resample_quarter_hours():
     index = pd.MultiIndex.from_product(
         [["FR"], ["ES"], pd.date_range(SNAPSHOTS[0], periods=16, freq="15min")],

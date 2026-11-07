@@ -170,6 +170,7 @@ electricity:
     from_powerplantmatching: true
     from_irenastat: false
     year: 2024
+    irenastat_source: powerplantmatching
     expansion_limit: false
     technology_mapping:
       Offshore: "offwind-ac"
@@ -468,6 +469,7 @@ conventional:
     utilisation: 0.35
     reference: nameplate
     exclude_areas: []
+  country_fuel_price: {}
   gas_price_cap:
     enable: false
     countries: []
@@ -570,6 +572,7 @@ backcast:
   fixed_border_capacities: {}
   exchange_proxy_borders: []
   exchange_proxy_fallback: false
+  exchange_proxy_by_direction_areas: []
   calibrate_wind: false
   wind_calibration_exclude: {}
   wind_calibration_factor_bounds:
@@ -578,6 +581,8 @@ backcast:
   wind_curtailment_twh: {}
   wind_target_twh: {}
   monthly_nuclear_availability: false
+  monthly_availability_carriers: []
+  monthly_availability_exclude: {}
   nuclear_area_map: {}
   nuclear_phase_out: {}
   exclude_generation_areas: []
@@ -1508,6 +1513,9 @@ data:
     source: primary
     version: latest
   ecb_exchange_rates:
+    source: primary
+    version: latest
+  irenastat_capacities:
     source: primary
     version: latest
   co2stop:

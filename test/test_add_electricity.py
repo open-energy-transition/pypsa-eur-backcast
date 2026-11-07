@@ -16,6 +16,7 @@ from scripts.add_electricity import (
     attach_stores,
     cap_phs_max_hours,
     estimate_efficiency,
+    read_irenastat,
 )
 from scripts.lib.validation.config.conventional import _EstimateEfficienciesConfig
 
@@ -142,3 +143,25 @@ def test_cap_phs_max_hours(tmp_path, country, max_hours, expected):
         pd.Series(max_hours, idx), pd.Series(country, idx), str(fn)
     )
     assert capped.at["phs"] == expected
+
+
+def test_read_irenastat(tmp_path):
+    """An IRENASTAT file in the powerplantmatching v0.9 layout reads with the technology names of the bundled file."""
+    fn = tmp_path / "irenastat.csv"
+    fn.write_text(
+        "Country/area,Technology,Grid connection,Year,Electricity capacity statistics\n"
+        "Germany,Onshore wind energy,OnGrid,2025,60000\n"
+        "Germany,Solar photovoltaic,OnGrid,2025,100000\n"
+        "Germany,Solar photovoltaic,OffGrid,2025,\n"
+        "France,Offshore wind energy,OnGrid,2025,1800\n"
+    )
+
+    df = read_irenastat(str(fn))
+
+    capacities = df.groupby(["Technology", "Country"]).Capacity.sum()
+    assert capacities.to_dict() == {
+        ("Offshore", "FR"): 1800,
+        ("Onshore", "DE"): 60000,
+        ("PV", "DE"): 100000,
+    }
+    assert (df.Year == 2025).all()

@@ -106,6 +106,10 @@ class BackcastConfig(ConfigModel):
         False,
         description="Fill gaps longer than `max_capacity_gap_hours` in the ENTSO-E capacity source of a border direction with the monthly maximum of the day-ahead scheduled commercial exchanges over both directions instead of raising an error, used with `electricity: cross_border_capacities: ntc`. The source of such directions is recorded as `<source>+scheduled_exchange`. E.g. for the Nordic borders, whose offered capacities end with the start of flow-based market coupling on 2024-10-29.",
     )
+    exchange_proxy_by_direction_areas: list[str] = Field(
+        default_factory=list,
+        description="ENTSO-E areas whose borders with each other use the monthly maximum of the day-ahead scheduled commercial exchanges per direction as exchange proxy, instead of the maximum over both directions. As the exchanges are netted per hour, the proxy of a rarely used direction is low. E.g. for the Nordic flow-based region, where the maximum over both directions gives rarely used directions the capacity of the busy one.",
+    )
 
     calibrate_wind: bool = Field(
         False,
@@ -138,6 +142,14 @@ class BackcastConfig(ConfigModel):
     monthly_nuclear_availability: bool = Field(
         False,
         description="Set the nuclear availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` and month to the actual monthly capacity factor, i.e. the actual generation divided by the hours with data and the nuclear capacity of the area, clipped to [0, 1]. After the last operating date in `nuclear_phase_out` the availability is zero. Every month before it must have actual generation, otherwise an error is raised. Areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
+    )
+    monthly_availability_carriers: list[str] = Field(
+        default_factory=list,
+        description="Further generator carriers whose availability is set per ENTSO-E area and month to the actual capacity factor like `monthly_nuclear_availability`, e.g. `[lignite, biomass, waste]` when these run at full availability in the model but not in reality. Generators of areas without published generation of the carrier, e.g. biomass in `SE_3`, and areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
+    )
+    monthly_availability_exclude: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="ENTSO-E areas per carrier of `monthly_availability_carriers` kept at their availability instead of the monthly capacity factor, e.g. `{coal: [PL]}` for a fleet used flexibly as a swing exporter, whose monthly mean capacity factor would wrongly flatten its hourly dispatch and distort the prices of its trading partners.",
     )
     nuclear_area_map: dict[str, str] = Field(
         default_factory=dict,

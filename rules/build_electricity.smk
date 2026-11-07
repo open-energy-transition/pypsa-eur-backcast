@@ -618,6 +618,9 @@ rule build_cross_border_capacities:
         max_capacity_gap_hours=config_provider("backcast", "max_capacity_gap_hours"),
         exchange_proxy_borders=config_provider("backcast", "exchange_proxy_borders"),
         exchange_proxy_fallback=config_provider("backcast", "exchange_proxy_fallback"),
+        exchange_proxy_by_direction_areas=config_provider(
+            "backcast", "exchange_proxy_by_direction_areas"
+        ),
     script:
         scripts("build_cross_border_capacities.py")
 

@@ -155,6 +155,12 @@ class ConventionalConfig(ConfigModel):
         default_factory=_MarginalCostSpreadConfig,
         description="Linear increase of the marginal cost of thermal generators with their output.",
     )
+    country_fuel_price: dict[
+        str, dict[str, dict[str, Annotated[float, Field(ge=0)]]]
+    ] = Field(
+        default_factory=dict,
+        description='Fuel price in EUR/MWh_th per carrier and country from a quoted ISO date until the next one, replacing the monthly price, e.g. `{coal: {PL: {"2022-01-01": 15.25}}}` for domestic coal sold to Polish power plants below the international price. The price is unchanged before the first date. Applied before the marginal cost and its spread are computed. Requires `dynamic_fuel_price` and `fuel_price_nominal`.',
+    )
     gas_price_cap: _GasPriceCapConfig = Field(
         default_factory=_GasPriceCapConfig,
         description="Cap of the gas price of gas-fired generators per country and period.",
@@ -190,6 +196,28 @@ class ConventionalConfig(ConfigModel):
         """Require dynamic fuel prices for the gas price cap."""
         assert self.dynamic_fuel_price or not self.gas_price_cap.enable, (
             "conventional: gas_price_cap requires dynamic_fuel_price."
+        )
+        return self
+
+    @field_validator("country_fuel_price")
+    @classmethod
+    def check_country_fuel_price_dates(
+        cls, value: dict[str, dict[str, dict[str, float]]]
+    ) -> dict[str, dict[str, dict[str, float]]]:
+        """Require ISO dates like `2022-01-01`."""
+        for prices in value.values():
+            for steps in prices.values():
+                for date in steps:
+                    datetime.date.fromisoformat(date)
+        return value
+
+    @model_validator(mode="after")
+    def check_country_fuel_price_nominal(self) -> "ConventionalConfig":
+        """Require nominal monthly fuel prices for the nominal country fuel prices."""
+        assert not self.country_fuel_price or (
+            self.dynamic_fuel_price and self.fuel_price_nominal
+        ), (
+            "conventional: country_fuel_price requires dynamic_fuel_price and fuel_price_nominal."
         )
         return self
 

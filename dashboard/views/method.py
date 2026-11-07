@@ -12,6 +12,7 @@ import streamlit as st
 
 from dashboard import narrative
 from dashboard.data import (
+    CACHE,
     EXPORT_MODEL,
     EXPORT_SCHEDULED,
     FOCUS_AREA,
@@ -20,6 +21,7 @@ from dashboard.data import (
     RunData,
     area_metrics,
     history_frame,
+    load_prices,
     summary,
 )
 from dashboard.views.common import CHART_HEIGHT, Context, export_direction, worst
@@ -142,10 +144,17 @@ def history() -> None:
         st.table(frame[["step", "result", "verdict"]])
 
 
+@st.cache_data
+def run_summary(name: str) -> dict[str, float]:
+    """Headline numbers of a cached run, read from its prices and flows only."""
+    path = CACHE / name
+    return summary(load_prices(path), pd.read_parquet(path / "flows.parquet"))
+
+
 def render(ctx: Context) -> None:
     """Draw the how-it-works page from method to refinement history, with whole-year results of the run and the cached runs of other years."""
-    runs = [ctx.run, *[ref.run for ref in ctx.references]]
-    table = pd.DataFrame({run.name: summary(run) for run in runs})
+    names = [ctx.run.name, *[ref.run.name for ref in ctx.references]]
+    table = pd.DataFrame({name: run_summary(name) for name in names})
     filled = facts(ctx.run, table[ctx.run.name].to_dict())
     method()
     headline_results(table, filled)
