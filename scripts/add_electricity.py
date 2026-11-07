@@ -267,20 +267,8 @@ def add_co2_emissions(n, costs, carriers):
     ].values
 
 
-def load_and_aggregate_powerplants(
-    ppl_fn: str,
-    costs: pd.DataFrame,
-    consider_efficiency_classes: bool | list[float] = False,
-    aggregation_strategies: dict = None,
-    exclude_carriers: list = None,
-    estimate_efficiencies: dict | None = None,
-) -> pd.DataFrame:
-    if not aggregation_strategies:
-        aggregation_strategies = {}
-
-    if not exclude_carriers:
-        exclude_carriers = []
-
+def read_powerplants(ppl_fn: str) -> pd.DataFrame:
+    """Read the power plants with PyPSA column names and model carriers."""
     carrier_dict = {
         "ocgt": "OCGT",
         "ccgt": "CCGT",
@@ -305,6 +293,24 @@ def load_and_aggregate_powerplants(
     ppl["carrier"] = ppl.carrier.where(
         ~ppl.carrier.isin(["hydro", "natural gas"]), ppl.technology
     )
+    return ppl
+
+
+def load_and_aggregate_powerplants(
+    ppl_fn: str,
+    costs: pd.DataFrame,
+    consider_efficiency_classes: bool | list[float] = False,
+    aggregation_strategies: dict = None,
+    exclude_carriers: list = None,
+    estimate_efficiencies: dict | None = None,
+) -> pd.DataFrame:
+    if not aggregation_strategies:
+        aggregation_strategies = {}
+
+    if not exclude_carriers:
+        exclude_carriers = []
+
+    ppl = read_powerplants(ppl_fn)
 
     cost_columns = [
         "VOM",
@@ -681,7 +687,9 @@ def attach_conventional_generators(
                 f"Capped the gas price of {len(capped)} generators in "
                 f"{gas_cap['countries']}."
             )
-        for carrier, prices in conventional_params.get("country_fuel_price", {}).items():
+        for carrier, prices in conventional_params.get(
+            "country_fuel_price", {}
+        ).items():
             for country, price in prices.items():
                 selected = ppl.index[ppl.carrier.eq(carrier) & countries.eq(country)]
                 assert not selected.empty, (

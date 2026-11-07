@@ -632,6 +632,26 @@ if (ENTSOE_GENERATION_DATA := dataset_version("entsoe_actual_generation"))[
             scripts("retrieve_actual_generation_entsoe.py")
 
 
+if (ENTSOE_UNAVAILABILITY_DATA := dataset_version("entsoe_unavailability"))[
+    "source"
+] in ["build"]:
+
+    rule retrieve_unavailability_entsoe:
+        """Downloads outages of generation and production units for one bidding zone and year from ENTSO-E."""
+        output:
+            csv=f"{ENTSOE_UNAVAILABILITY_DATA['folder']}"
+            + "/unavailability_{area}_{year}.csv",
+        log:
+            "logs/retrieve_unavailability_entsoe_{area}_{year}.log",
+        wildcard_constraints:
+            year=r"\d{4}",
+        retries: 2
+        resources:
+            mem_mb=4000,
+        script:
+            scripts("retrieve_unavailability_entsoe.py")
+
+
 if (ENTSOE_CAPACITIES_DATA := dataset_version("entsoe_cross_border_capacities"))[
     "source"
 ] in ["build"]:

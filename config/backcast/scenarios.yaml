@@ -289,6 +289,8 @@ backcast-2023:
       DE_LU: {onwind: 6, offwind: 4}
     nuclear_phase_out:
       DE_LU: "2023-04-15"
+    unavailability:
+      enable: true
 
 backcast-2024:
   snapshots:

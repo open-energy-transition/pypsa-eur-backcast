@@ -376,7 +376,13 @@ def test_apply_monthly_availability_exclude(network, caplog):
 def test_apply_monthly_availability_exclude_raises(network):
     with pytest.raises(AssertionError, match="Unknown ENTSO-E"):
         apply_monthly_availability(
-            network, frame(ES_NUCLEAR_JAN), AREA_TO_BUS, "nuclear", {}, {}, exclude=["XX"]
+            network,
+            frame(ES_NUCLEAR_JAN),
+            AREA_TO_BUS,
+            "nuclear",
+            {},
+            {},
+            exclude=["XX"],
         )
 
 
@@ -472,6 +478,14 @@ def test_calibration_warns_on_clipping(network, caplog, calibrate):
         {
             "wind_target_twh": {"GB": {"onwind": -1.0}},
             "exclude_generation_areas": ["GB"],
+        },
+        {
+            "unavailability": {"enable": True},
+            "monthly_availability_carriers": ["coal"],
+        },
+        {
+            "unavailability": {"enable": True, "carriers": ["nuclear"]},
+            "monthly_nuclear_availability": False,
         },
     ],
 )

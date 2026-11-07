@@ -261,9 +261,11 @@ class ConfigSchema(BaseModel):
             self.backcast.calibrate_wind
             or self.backcast.monthly_nuclear_availability
             or self.backcast.monthly_availability_carriers
+            or self.backcast.unavailability.enable
         )
         assert self.foresight.root == "overnight" or not calibrate, (
-            "backcast: calibrate_wind, monthly_nuclear_availability and monthly_availability_carriers require foresight: overnight."
+            "backcast: calibrate_wind, monthly_nuclear_availability, "
+            "monthly_availability_carriers and unavailability require foresight: overnight."
         )
         return self
 

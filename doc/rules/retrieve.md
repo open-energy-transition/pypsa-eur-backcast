@@ -30,6 +30,7 @@ file in the repository root, which is loaded automatically and ignored by git.
 | `retrieve_day_ahead_prices_entsoe` | An [ENTSO-E Transparency Platform](https://transparency.entsoe.eu) API token in `ENTSOE_API_TOKEN`. Only needed for [build_day_ahead_prices][]. |
 | `retrieve_cross_border_capacities_entsoe` | An [ENTSO-E Transparency Platform](https://transparency.entsoe.eu) API token in `ENTSOE_API_TOKEN`. Only needed for [build_cross_border_capacities][], i.e. when `electricity: cross_border_capacities: ntc`. |
 | `retrieve_actual_generation_entsoe` | An [ENTSO-E Transparency Platform](https://transparency.entsoe.eu) API token in `ENTSOE_API_TOKEN`. Only needed for [build_entsoe_generation][], i.e. with `backcast: calibrate_wind` or `backcast: monthly_nuclear_availability`. |
+| `retrieve_unavailability_entsoe` | An [ENTSO-E Transparency Platform](https://transparency.entsoe.eu) API token in `ENTSOE_API_TOKEN`. Only needed for [build_unavailability][], i.e. with `backcast: unavailability: enable`. |
 | `retrieve_corine` | A [Copernicus Land Monitoring Service](https://land.copernicus.eu/user/login) API key in `CORINE_API_TOKEN`. Only needed when `data: corine: source: primary`. |
 | `retrieve_seawater_temperature` | [Copernicus Marine Service](https://marine.copernicus.eu/) credentials configured for the `copernicusmarine` package. Only needed when heat pumps use the `sea_water` heat source with a non-test cutout. |
 
@@ -45,7 +46,8 @@ file in the repository root, which is loaded automatically and ignored by git.
     CDSAPI_KEY=<your-personal-access-token>
 
     # retrieve_electricity_demand_entsoe, retrieve_day_ahead_prices_entsoe,
-    # retrieve_cross_border_capacities_entsoe, retrieve_actual_generation_entsoe:
+    # retrieve_cross_border_capacities_entsoe, retrieve_actual_generation_entsoe,
+    # retrieve_unavailability_entsoe:
     # ENTSO-E Transparency Platform
     ENTSOE_API_TOKEN=<your-entsoe-token>
 
