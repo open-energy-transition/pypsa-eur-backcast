@@ -11,9 +11,13 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scripts.evaluate_price_backcast import PLOTS, plot_page
 from scripts.lib.backcast_data import (
     align_prices,
+    area_metrics,
     duration_curve,
+    hourly_area_bias,
     monthly_bias,
     price_metrics,
+    summary_metrics,
+    zone_group_metrics,
 )
 
 
@@ -146,3 +150,89 @@ def test_plot_page(model, observed, title, tmp_path):
         plot_page(pdf, title, PLOTS[title], *align_prices(model, observed))
 
     assert path.stat().st_size > 0
+
+
+@pytest.fixture
+def area_to_bus():
+    return pd.Series({"DE00": "DE_LU", "LUG1": "DE_LU", "FR00": "FR", "ES00": "ES"})
+
+
+@pytest.fixture
+def bus_metrics():
+    return pd.DataFrame(
+        {
+            "mae": [2.0, 4, 1, 10],
+            "mean_bias": [-2.0, 4, 1, -6],
+            "pearson_r": [0.8, 0.6, 0.9, 0.5],
+            "std_ratio": [0.5, 0.7, 1.0, 0.9],
+            "zero_share_model": [0.0, 0, 0.1, 0],
+            "negative_share_model": [0.1, 0.1, 0, 0],
+            "zero_share_observed": [0.0, 0, 0, 0.2],
+            "negative_share_observed": [0.2, 0.2, 0, 0],
+        },
+        index=pd.Index(["DE00", "LUG1", "FR00", "ES00"], name="bus"),
+    )
+
+
+def test_area_metrics_counts_each_area_once(bus_metrics, area_to_bus):
+    metrics = area_metrics(bus_metrics, area_to_bus)
+
+    pd.testing.assert_series_equal(
+        metrics.mae,
+        pd.Series({"DE_LU": 3.0, "ES": 10, "FR": 1}, name="mae").rename_axis("area"),
+    )
+
+
+def test_area_metrics_fails_on_unmapped_bus(bus_metrics, area_to_bus):
+    with pytest.raises(KeyError):
+        area_metrics(bus_metrics, area_to_bus.drop("LUG1"))
+
+
+@pytest.mark.parametrize(
+    "key, expected",
+    [
+        ("median_mae", 3.0),
+        ("mean_mae", 14 / 3),
+        ("pearson_r", 0.7),
+        ("abs_bias", 1.0),
+        ("std_ratio", 0.9),
+        ("share_le0_model", 0.2 / 3),
+        ("share_le0_observed", 0.4 / 3),
+        ("count", 3),
+    ],
+)
+def test_summary_metrics(bus_metrics, area_to_bus, key, expected):
+    summary = summary_metrics(area_metrics(bus_metrics, area_to_bus))
+
+    assert summary[key] == pytest.approx(expected)
+
+
+def test_zone_group_metrics(bus_metrics, area_to_bus):
+    groups = zone_group_metrics(area_metrics(bus_metrics, area_to_bus))
+
+    expected = pd.DataFrame(
+        {"mae": [2.0, 10], "mean_bias": [1.0, -6], "pearson_r": [0.8, 0.5]},
+        index=pd.Index(["Central West", "Iberia"], name="group"),
+    ).assign(count=[2, 1])
+    pd.testing.assert_frame_equal(groups, expected)
+
+
+def test_zone_group_metrics_rejects_unknown_area(bus_metrics, area_to_bus):
+    metrics = area_metrics(bus_metrics, area_to_bus).rename(index={"ES": "XX"})
+
+    with pytest.raises(AssertionError, match=r"\['XX'\]"):
+        zone_group_metrics(metrics)
+
+
+def test_hourly_area_bias(area_to_bus):
+    index = pd.date_range("2023-01-01", periods=48, freq="h")
+    observed = pd.DataFrame(50.0, index, columns=area_to_bus.index)
+    model = observed + pd.Series({"DE00": 2.0, "LUG1": 4, "FR00": -1, "ES00": 5})
+
+    bias = hourly_area_bias(model, observed, area_to_bus)
+
+    pd.testing.assert_series_equal(
+        bias,
+        pd.Series(3.0, pd.RangeIndex(24, name="hour"), name="bias"),
+        check_index_type=False,
+    )

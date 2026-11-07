@@ -12,9 +12,11 @@ price. The per-bus metrics are the mean bias, mean absolute error, root mean
 squared error, root mean squared error of prices clipped to
 ``CLIP_PRICE_RANGE``, Pearson correlation, ratio of standard deviations, the
 observed and modelled mean prices, the observed standard deviation and the
-shares of zero and negative price hours. The monthly mean bias is written as
-separate table. Monthly means, price duration curves, average daily profiles
-and hourly scatter plots are written to one multi-page PDF.
+shares of zero and negative price hours. The same metrics per price area,
+averaging the buses of one ENTSO-E area so that each area counts once, and the
+monthly mean bias are written as separate tables. Monthly means, price
+duration curves, average daily profiles and hourly scatter plots are written
+to one multi-page PDF.
 """
 
 import logging
@@ -30,10 +32,12 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scripts._helpers import configure_logging, set_scenario_config
 from scripts.lib.backcast_data import (
     align_prices,
+    area_metrics,
     duration_curve,
     monthly_bias,
     price_metrics,
 )
+from scripts.lib.entsoe import read_area_to_bus
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +114,8 @@ if __name__ == "__main__":
     metrics = price_metrics(model, observed)
     logger.info(f"Price backcast metrics:\n{metrics.round(2)}")
     metrics.to_csv(snakemake.output.metrics)
+    area_to_bus = read_area_to_bus(snakemake.input.area_to_bus)
+    area_metrics(metrics, area_to_bus).to_csv(snakemake.output.area_metrics)
     monthly_bias(model, observed).to_csv(snakemake.output.monthly_bias)
 
     with PdfPages(snakemake.output.plots) as pdf:
