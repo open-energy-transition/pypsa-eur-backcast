@@ -230,3 +230,24 @@ class BackcastConfig(ConfigModel):
             f"backcast: wind_target_twh given for areas not in exclude_generation_areas: {published}"
         )
         return self
+
+    @model_validator(mode="after")
+    def check_unavailability_carriers(self) -> "BackcastConfig":
+        """Require a monthly fallback for nuclear and no carrier calibrated twice."""
+        unavailability = self.unavailability
+        if not unavailability.enable:
+            return self
+        assert (
+            "nuclear" not in unavailability.carriers
+            or self.monthly_nuclear_availability
+        ), (
+            "backcast: unavailability of nuclear requires monthly_nuclear_availability "
+            "as fallback for areas below min_coverage."
+        )
+        overlap = sorted(
+            set(unavailability.carriers) & set(self.monthly_availability_carriers)
+        )
+        assert not overlap, (
+            f"backcast: carriers in both unavailability and monthly_availability_carriers: {overlap}"
+        )
+        return self

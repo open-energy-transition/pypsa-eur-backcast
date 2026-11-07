@@ -314,9 +314,9 @@ def apply_unavailability(
     applied = []
     for (bus, carrier), unavailable in share.items():
         gens = g.index[(g.bus == bus) & (g.carrier == carrier)]
-        area = area_to_bus.get(bus)
-        if gens.empty or area is None:
+        if gens.empty:
             continue
+        area = area_to_bus[bus]
         covered = coverage.coverage.get((area, carrier), 0.0)
         if covered < min_coverage.get(carrier, 0.0):
             logger.info(
