@@ -460,6 +460,13 @@
           "description": "Fill gaps longer than `max_capacity_gap_hours` in the ENTSO-E capacity source of a border direction with the monthly maximum of the day-ahead scheduled commercial exchanges over both directions instead of raising an error, used with `electricity: cross_border_capacities: ntc`. The source of such directions is recorded as `<source>+scheduled_exchange`. E.g. for the Nordic borders, whose offered capacities end with the start of flow-based market coupling on 2024-10-29.",
           "type": "boolean"
         },
+        "exchange_proxy_by_direction_areas": {
+          "description": "ENTSO-E areas whose borders with each other use the monthly maximum of the day-ahead scheduled commercial exchanges per direction as exchange proxy, instead of the maximum over both directions. As the exchanges are netted per hour, the proxy of a rarely used direction is low. E.g. for the Nordic flow-based region, where the maximum over both directions gives rarely used directions the capacity of the busy one.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "calibrate_wind": {
           "default": false,
           "description": "Scale the onshore and offshore wind availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual generation reported by the ENTSO-E Transparency Platform plus `wind_curtailment_twh`. Only months with actual generation of the carrier are compared. One factor per area and carrier, `p_max_pu` is clipped at 1. Wind carriers with capacity but without actual generation in an area that publishes generation, e.g. offshore wind in `IE_SEM`, get zero availability. Areas without published generation are scaled to `wind_target_twh` or keep their availability, as do carriers excluded in `wind_calibration_exclude`. Requires `foresight: overnight`.",
@@ -1577,6 +1584,26 @@
           }
         },
         "mibgas_gas_prices": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "irenastat_capacities": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {
@@ -2913,6 +2940,15 @@
               "default": 2024,
               "description": "Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
               "type": "integer"
+            },
+            "irenastat_source": {
+              "default": "powerplantmatching",
+              "description": "Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+              "enum": [
+                "powerplantmatching",
+                "retrieve"
+              ],
+              "type": "string"
             },
             "expansion_limit": {
               "anyOf": [
@@ -8483,6 +8519,15 @@
           "description": "Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
           "type": "integer"
         },
+        "irenastat_source": {
+          "default": "powerplantmatching",
+          "description": "Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+          "enum": [
+            "powerplantmatching",
+            "retrieve"
+          ],
+          "type": "string"
+        },
         "expansion_limit": {
           "anyOf": [
             {
@@ -11110,6 +11155,15 @@
               "description": "Renewable capacities are based on existing capacities reported by IRENA (IRENASTAT) for the specified year.",
               "type": "integer"
             },
+            "irenastat_source": {
+              "default": "powerplantmatching",
+              "description": "Source of the IRENASTAT capacities. 'powerplantmatching' uses the file bundled with the installed powerplantmatching version, 'retrieve' the data source `irenastat_capacities`, which covers years up to 2025.",
+              "enum": [
+                "powerplantmatching",
+                "retrieve"
+              ],
+              "type": "string"
+            },
             "expansion_limit": {
               "anyOf": [
                 {
@@ -13048,6 +13102,13 @@
           "default": false,
           "description": "Fill gaps longer than `max_capacity_gap_hours` in the ENTSO-E capacity source of a border direction with the monthly maximum of the day-ahead scheduled commercial exchanges over both directions instead of raising an error, used with `electricity: cross_border_capacities: ntc`. The source of such directions is recorded as `<source>+scheduled_exchange`. E.g. for the Nordic borders, whose offered capacities end with the start of flow-based market coupling on 2024-10-29.",
           "type": "boolean"
+        },
+        "exchange_proxy_by_direction_areas": {
+          "description": "ENTSO-E areas whose borders with each other use the monthly maximum of the day-ahead scheduled commercial exchanges per direction as exchange proxy, instead of the maximum over both directions. As the exchanges are netted per hour, the proxy of a rarely used direction is low. E.g. for the Nordic flow-based region, where the maximum over both directions gives rarely used directions the capacity of the busy one.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "calibrate_wind": {
           "default": false,
@@ -15877,6 +15938,26 @@
           }
         },
         "mibgas_gas_prices": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "irenastat_capacities": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {

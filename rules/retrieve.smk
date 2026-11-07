@@ -1268,6 +1268,20 @@ if (MIBGAS_GAS_PRICES_DATASET := dataset_version("mibgas_gas_prices"))["source"]
                 f.write(r.content)
 
 
+if (IRENASTAT_CAPACITIES_DATASET := dataset_version("irenastat_capacities"))[
+    "source"
+] in ["primary"]:
+
+    rule retrieve_irenastat_capacities:
+        """Retrieves the IRENASTAT renewable capacities per country, technology and year."""
+        input:
+            csv=storage(IRENASTAT_CAPACITIES_DATASET["url"]),
+        output:
+            csv=f"{IRENASTAT_CAPACITIES_DATASET['folder']}/IRENASTAT_capacities.csv",
+        run:
+            copy2(input["csv"], output["csv"])
+
+
 if (
     WORLD_BANK_COMMODITY_PRICES_DATASET := dataset_version("worldbank_commodity_prices")
 )["source"] in ["primary", "archive"]:

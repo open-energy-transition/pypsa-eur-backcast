@@ -170,6 +170,7 @@ electricity:
     from_powerplantmatching: true
     from_irenastat: false
     year: 2024
+    irenastat_source: powerplantmatching
     expansion_limit: false
     technology_mapping:
       Offshore: "offwind-ac"
@@ -571,6 +572,7 @@ backcast:
   fixed_border_capacities: {}
   exchange_proxy_borders: []
   exchange_proxy_fallback: false
+  exchange_proxy_by_direction_areas: []
   calibrate_wind: false
   wind_calibration_exclude: {}
   wind_calibration_factor_bounds:
@@ -1508,6 +1510,9 @@ data:
     source: primary
     version: latest
   mibgas_gas_prices:
+    source: primary
+    version: latest
+  irenastat_capacities:
     source: primary
     version: latest
   co2stop:
