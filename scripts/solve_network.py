@@ -1387,7 +1387,8 @@ def collect_kwargs(
     solve_kwargs["solver_name"] = solver_name
     solve_kwargs["solver_options"] = solver_options
     solve_kwargs["assign_all_duals"] = cf_solving.get("assign_all_duals", False)
-    solve_kwargs["io_api"] = cf_solving.get("io_api", None)
+    if cf_solving.get("io_api"):
+        solve_kwargs["io_api"] = cf_solving["io_api"]
     solve_kwargs["keep_files"] = cf_solving.get("keep_files", False)
 
     if log_fn:
