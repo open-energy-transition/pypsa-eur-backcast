@@ -157,13 +157,18 @@ def test_to_eur_uses_rate_of_day_or_last_before(rates):
     assert result.name == "PL"
 
 
-def test_to_eur_keeps_eur_and_raises_without_rate(rates):
+@pytest.mark.parametrize("currency, expected", [("EUR", 1.0), ("BGN", 1 / 1.95583)])
+def test_to_eur_passes_eur_and_converts_pegged_rate(rates, currency, expected):
     prices = pd.Series(1.0, pd.date_range("2019-01-03", periods=2, freq="h"))
 
-    assert to_eur(prices, "EUR", rates) is prices
+    np.testing.assert_allclose(to_eur(prices, currency, rates), expected)
+
+
+def test_to_eur_raises_without_rate(rates):
+    prices = pd.Series(1.0, pd.date_range("2019-01-03", periods=2, freq="h"))
+
     with pytest.raises(AssertionError, match="No ECB PLN rate"):
         to_eur(prices, "PLN", rates)
-    np.testing.assert_allclose(to_eur(prices, "BGN", rates), 1 / 1.95583)
 
 
 @pytest.mark.parametrize(

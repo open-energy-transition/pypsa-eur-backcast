@@ -44,14 +44,16 @@ def read_prices(path: str) -> tuple[pd.Series, str]:
 
 def read_exchange_rates(path: str) -> pd.DataFrame:
     """Read the daily ECB reference rates in units of each currency per EUR."""
-    rates = pd.read_csv(path, index_col="Date", parse_dates=True, na_values="N/A")
-    return rates.sort_index()
+    return pd.read_csv(
+        path, index_col="Date", parse_dates=True, na_values="N/A"
+    ).sort_index()
 
 
 def to_eur(prices: pd.Series, currency: str, rates: pd.DataFrame) -> pd.Series:
     """Convert hourly prices with naive UTC timestamps to EUR with the reference rate of their day or the last one before."""
     if currency == "EUR":
         return prices
+    logger.info(f"Converting day-ahead prices of {prices.name} from {currency} to EUR.")
     rate = rates[currency].dropna()
     days = prices.index.normalize()
     assert days.min() >= rate.index[0] and days.max() <= rate.index[-1], (
@@ -93,11 +95,6 @@ if __name__ == "__main__":
 
     rates = read_exchange_rates(snakemake.input.exchange_rates)
     raw = [read_prices(fn) for fn in snakemake.input.prices]
-    for s, currency in raw:
-        if currency != "EUR":
-            logger.info(
-                f"Converting day-ahead prices of {s.name} from {currency} to EUR."
-            )
     hourly = pd.concat(
         [to_eur(to_hourly_utc(s), currency, rates) for s, currency in raw],
         keys=[s.name for s, _ in raw],

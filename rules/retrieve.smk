@@ -1283,13 +1283,12 @@ if (ECB_EXCHANGE_RATES_DATASET := dataset_version("ecb_exchange_rates"))["source
             mem_mb=1000,
         run:
             from io import BytesIO
-            from zipfile import ZipFile
 
             r = requests.get(ECB_EXCHANGE_RATES_DATASET["url"], timeout=120)
             r.raise_for_status()
-            with ZipFile(BytesIO(r.content)) as archive:
-                with open(output["csv"], "wb") as f:
-                    f.write(archive.read("eurofxref-hist.csv"))
+            ZipFile(BytesIO(r.content)).extract(
+                "eurofxref-hist.csv", Path(output["csv"]).parent
+            )
 
 
 if (IRENASTAT_CAPACITIES_DATASET := dataset_version("irenastat_capacities"))[
