@@ -615,6 +615,21 @@ backcast:
     - oil
     min_coverage:
       nuclear: 0.9
+  chp_floor:
+    enable: false
+    year:
+    heat_threshold: 15.0
+    hot_water_share: 0.2
+    fuels:
+    - gas
+    - coal
+    - lignite
+    - oil
+    - biomass
+    - waste
+    replace_p_min_pu:
+    - biomass
+    - waste
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration/#pypsa_eur_cf
 pypsa_eur:
@@ -1590,6 +1605,9 @@ data:
     version: latest
   entsoe_cross_border_capacities:
     source: build
+    version: latest
+  eurostat_chp_production:
+    source: primary
     version: latest
   neso_electricity_demand:
     source: archive

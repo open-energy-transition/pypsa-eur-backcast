@@ -301,6 +301,10 @@ class DataConfig(BaseModel):
         default_factory=lambda: _DataSourceConfig(source="build"),
         description="ENTSO-E day-ahead cross-border capacities data source configuration.",
     )
+    eurostat_chp_production: _DataSourceConfig = Field(
+        default_factory=lambda: _DataSourceConfig(source="primary"),
+        description="Eurostat gross production of electricity and heat by plant type and fuel (nrg_bal_peh) data source configuration, used for the heat-led CHP floor `backcast: chp_floor`.",
+    )
     neso_electricity_demand: _DataSourceConfig = Field(
         default_factory=lambda: _DataSourceConfig(source="archive"),
         description="NESO electricity demand data source configuration.",

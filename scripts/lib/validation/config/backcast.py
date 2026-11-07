@@ -77,6 +77,38 @@ class UnavailabilityConfig(ConfigModel):
     )
 
 
+ChpFuel = Literal["gas", "coal", "lignite", "oil", "biomass", "waste"]
+
+
+class ChpFloorConfig(ConfigModel):
+    """Configuration for `backcast.chp_floor` settings."""
+
+    enable: bool = Field(
+        False,
+        description="Add an hourly heat-led minimum output (`p_min_pu`) to the conventional generators of each country and fuel group. The annual floor energy is the minimum of the back-pressure ratio `c_b` of the CHP technology in the cost data times the main-activity CHP heat output and the main-activity CHP electricity output in Eurostat `nrg_bal_peh` for the snapshot year or `year`. It follows a daily heat demand profile from the cutout temperature, weighted by the urban population.",
+    )
+    year: int | None = Field(
+        None,
+        description="Year of the Eurostat `nrg_bal_peh` CHP output that sets the annual floor energy. Defaults to the snapshot year. Set it for snapshot years Eurostat does not cover yet; the heat profile still follows the snapshot weather.",
+    )
+    heat_threshold: float = Field(
+        15.0,
+        description="Daily mean temperature in degree Celsius below which space heating demand arises (heating degree days).",
+    )
+    hot_water_share: Annotated[float, Field(ge=0, lt=1)] = Field(
+        0.2,
+        description="Share of the annual heat demand that is flat over the year (hot water and network losses). Eurostat `nrg_d_hhq` gives a water heating share of household derived heat of 0.23 (2019) and 0.25 (2023) for the EU27, with a country median of 0.17.",
+    )
+    fuels: list[ChpFuel] = Field(
+        default_factory=lambda: ["gas", "coal", "lignite", "oil", "biomass", "waste"],
+        description="Fuel groups that receive the floor: gas (CCGT, OCGT), coal, lignite, oil, biomass and waste.",
+    )
+    replace_p_min_pu: list[ChpFuel] = Field(
+        default_factory=lambda: ["biomass", "waste"],
+        description="Fuel groups whose flat `conventional: <carrier>: p_min_pu` is replaced by the floor in countries with a floor. Countries without Eurostat data keep the flat value.",
+    )
+
+
 class BackcastConfig(ConfigModel):
     """Configuration for `backcast` settings."""
 
@@ -187,6 +219,10 @@ class BackcastConfig(ConfigModel):
     unavailability: UnavailabilityConfig = Field(
         default_factory=UnavailabilityConfig,
         description="Thermal availability from the ENTSO-E unavailability of generation and production units.",
+    )
+    chp_floor: ChpFloorConfig = Field(
+        default_factory=ChpFloorConfig,
+        description="Heat-led minimum output of combined heat and power plants.",
     )
 
     @field_validator("fixed_border_capacities", "exchange_proxy_borders")

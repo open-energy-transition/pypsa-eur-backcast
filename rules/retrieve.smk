@@ -612,6 +612,21 @@ if (ENTSOE_PRICES_DATA := dataset_version("entsoe_day_ahead_prices"))["source"] 
             scripts("retrieve_day_ahead_prices_entsoe.py")
 
 
+if (EUROSTAT_CHP_DATA := dataset_version("eurostat_chp_production"))["source"] in [
+    "primary"
+]:
+
+    rule retrieve_eurostat_chp_production:
+        """Retrieves Eurostat gross production of electricity and heat by plant type and fuel."""
+        input:
+            tsv_gz=storage(EUROSTAT_CHP_DATA["url"]),
+        output:
+            tsv_gz=f"{EUROSTAT_CHP_DATA['folder']}/estat_nrg_bal_peh.tsv.gz",
+        retries: 2
+        run:
+            copy2(input["tsv_gz"], output["tsv_gz"])
+
+
 if (ENTSOE_GENERATION_DATA := dataset_version("entsoe_actual_generation"))[
     "source"
 ] in ["build"]:

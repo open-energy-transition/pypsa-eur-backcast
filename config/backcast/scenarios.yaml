@@ -62,7 +62,7 @@ backcast-2019: &backcast-2019
     wind_curtailment_twh:
       DE_LU: {onwind: 5.1, offwind: 1.2}
 
-backcast-2019-plain:  # unrefined 2019 reference: 2019 without the hydro, must-run, cost spread, wind, nuclear and hybrid capacity refinements
+backcast-2019-plain:  # unrefined 2019 reference: 2019 without the hydro, must-run, CHP floor, cost spread, wind, nuclear and hybrid capacity refinements
   <<: *backcast-2019
   renewable:
     hydro:
@@ -85,6 +85,8 @@ backcast-2019-plain:  # unrefined 2019 reference: 2019 without the hydro, must-r
     <<: *backcast-2019-backcast
     calibrate_wind: false
     monthly_nuclear_availability: false
+    chp_floor:
+      enable: false
     hybrid_capacities:
       enable: false
 
@@ -365,6 +367,8 @@ backcast-2025:
       reference_year: 2025
 
   backcast:
+    chp_floor:
+      year: 2024  # Eurostat nrg_bal_peh has no 2025 data yet
     exclude_price_areas: [AL, BA, GB, ME, MK, XK]
     fixed_border_capacities:
       IT_CALA-IT_CSUD: physical

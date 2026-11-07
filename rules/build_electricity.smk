@@ -633,6 +633,33 @@ rule build_unavailability:
         scripts("build_unavailability.py")
 
 
+rule build_chp_floor:
+    """Builds the hourly heat-led minimum output of CHP plants per country and fuel group."""
+    input:
+        eurostat=f"{EUROSTAT_CHP_DATA['folder']}/estat_nrg_bal_peh.tsv.gz",
+        tech_costs=lambda w: resources(
+            f"costs_{config_provider('planning_horizons')(w)[0]}_processed.csv"
+        ),
+        country_shapes=resources("country_shapes.geojson"),
+        pop_layout=resources("pop_layout_urban.nc"),
+        cutout=lambda w: input_cutout(w),
+    output:
+        resources("chp_floor.csv"),
+    log:
+        logs("build_chp_floor.log"),
+    benchmark:
+        benchmarks("build_chp_floor")
+    threads: 1
+    resources:
+        mem_mb=8000,
+    params:
+        snapshots=config_provider("snapshots"),
+        drop_leap_day=config_provider("enable", "drop_leap_day"),
+        chp_floor=config_provider("backcast", "chp_floor"),
+    script:
+        scripts("build_chp_floor.py")
+
+
 rule build_cross_border_capacities:
     """Builds hourly cross-border capacities between the buses of the bidding zone clustered network."""
     input:

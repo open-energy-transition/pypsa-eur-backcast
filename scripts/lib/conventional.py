@@ -32,6 +32,49 @@ def clip_p_min_pu(n: pypsa.Network) -> None:
     logger.info(f"Clipped p_min_pu to p_max_pu for {len(clipped)} generators.")
 
 
+CHP_FUEL_CARRIERS = {
+    "gas": ["CCGT", "OCGT"],
+    "coal": ["coal"],
+    "lignite": ["lignite"],
+    "oil": ["oil"],
+    "biomass": ["biomass"],
+    "waste": ["waste"],
+}
+
+
+def apply_chp_floor(
+    n: pypsa.Network, floor: pd.DataFrame, replace_p_min_pu: list[str]
+) -> None:
+    """Raise ``p_min_pu`` to the heat-led CHP floor in MW per country and fuel, shared by capacity over the generators of the group; the flat ``p_min_pu`` of fuels in ``replace_p_min_pu`` is dropped where a floor applies."""
+    carrier_fuel = {c: f for f, cs in CHP_FUEL_CARRIERS.items() for c in cs}
+    g = n.generators
+    groups = pd.MultiIndex.from_arrays(
+        [g.bus.map(n.buses.country), g.carrier.map(carrier_fuel)]
+    )
+    covered = g.index[groups.isin(floor.columns)]
+    keys = groups[g.index.get_indexer(covered)]
+    floor = floor.reindex(n.snapshots)
+    assert floor.notna().all().all(), "CHP floor does not cover the snapshots."
+    p_nom = g.p_nom[covered].groupby(keys).sum()
+    share = floor[keys].div(p_nom[keys].to_numpy()).set_axis(covered, axis=1)
+    replaced = covered[keys.get_level_values(1).isin(replace_p_min_pu)]
+    n.generators.loc[replaced, "p_min_pu"] = 0.0
+    n.generators_t.p_min_pu = n.generators_t.p_min_pu.drop(
+        columns=replaced, errors="ignore"
+    )
+    p_min_pu = n.get_switchable_as_dense("Generator", "p_min_pu", inds=covered)
+    n.generators_t.p_min_pu = pd.concat(
+        [
+            n.generators_t.p_min_pu.drop(columns=covered, errors="ignore"),
+            np.maximum(p_min_pu, share),
+        ],
+        axis=1,
+    )
+    logger.info(
+        f"Applied the CHP floor to {len(covered)} generators in {len(p_nom)} country and fuel groups."
+    )
+
+
 OBSERVED_GROUPS = {
     "CCGT": "gas",
     "OCGT": "gas",

@@ -45,7 +45,11 @@ from scripts.lib.backcast_calibration import (
     calibrate_wind,
     read_generation,
 )
-from scripts.lib.conventional import clip_p_min_pu, spread_marginal_cost
+from scripts.lib.conventional import (
+    apply_chp_floor,
+    clip_p_min_pu,
+    spread_marginal_cost,
+)
 from scripts.lib.cross_border import apply_cross_border_capacities, raise_to_physical
 from scripts.lib.entsoe import assert_known_areas, read_area_to_bus
 from scripts.lib.unavailability import apply_unavailability
@@ -232,6 +236,13 @@ if __name__ == "__main__":
     adjustments = params.adjustments
     maybe_adjust_costs_and_potentials(n, adjustments["electricity"], current_horizon)
     maybe_adjust_costs_and_potentials(n, adjustments["sector"], current_horizon)
+
+    chp_floor = params.backcast["chp_floor"]
+    if chp_floor["enable"]:
+        floor = pd.read_csv(
+            inputs.chp_floor, index_col=0, header=[0, 1], parse_dates=True
+        )
+        apply_chp_floor(n, floor, chp_floor["replace_p_min_pu"])
 
     clip_p_min_pu(n)
     spread = params.conventional["marginal_cost_spread"]
