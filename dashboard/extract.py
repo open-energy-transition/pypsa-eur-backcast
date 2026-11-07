@@ -18,6 +18,7 @@ import geopandas as gpd
 import pandas as pd
 import pypsa
 import yaml
+from snakemake.utils import update_config
 
 from scripts.lib.backcast_data import (
     align_prices,
@@ -34,17 +35,13 @@ POWER_FRAMES = {"load", "generation", "flows"}
 
 
 def run_config(run: str) -> dict:
-    """Read the default config updated by the run config ``config/backcast/config.<run>.yaml``."""
-    default = yaml.safe_load(Path("config/config.default.yaml").read_text())
-    override = yaml.safe_load(Path(f"config/backcast/config.{run}.yaml").read_text())
-    return {
-        "planning_horizons": override.get(
-            "planning_horizons", default["planning_horizons"]
-        ),
-        "area_to_bus": {**default["backcast"], **override.get("backcast", {})}[
-            "area_to_bus"
-        ],
-    }
+    """Read the default config updated by ``config/backcast/config.backcast.yaml`` and the scenario of the run."""
+    config = yaml.safe_load(Path("config/config.default.yaml").read_text())
+    base = yaml.safe_load(Path("config/backcast/config.backcast.yaml").read_text())
+    scenarios = yaml.safe_load(Path(base["run"]["scenarios"]["file"]).read_text())
+    for override in (base, scenarios[run]):
+        update_config(config, override)
+    return config
 
 
 def sources(run_dir: Path) -> dict[str, Path]:
@@ -52,7 +49,7 @@ def sources(run_dir: Path) -> dict[str, Path]:
     run = run_dir.name
     config = run_config(run)
     resources = Path("resources") / run
-    year = config["planning_horizons"][-1]
+    year = pd.Timestamp(config["snapshots"]["start"]).year
     return {
         "network": run_dir / f"networks/solved_{year}.nc",
         "prices": resources / "day_ahead_prices.csv",
@@ -62,7 +59,7 @@ def sources(run_dir: Path) -> dict[str, Path]:
         "regions": resources / "onshore_regions.geojson",
         "metrics": run_dir / "backcast/price_metrics.csv",
         "monthly_bias": run_dir / "backcast/price_monthly_bias.csv",
-        "area_to_bus": Path(config["area_to_bus"]),
+        "area_to_bus": Path(config["backcast"]["area_to_bus"]),
     }
 
 

@@ -17,7 +17,7 @@ pypsa = "0d"
 atlite = "0d"
 
 [tasks]
-backcast = { cmd = "snakemake results/backcast-{{ year }}/backcast/price_metrics.csv backcast_figures -j8 --configfile config/backcast/config.backcast-{{ year }}.yaml --resources entsoe=2 {{ snakemake_args }}", args = [{ arg = "year", default = "2023" }, { arg = "snakemake_args", default = "" }] }
+backcast = { cmd = "snakemake results/backcast-{{ year }}/backcast/price_metrics.csv backcast_figures -j8 --configfile config/backcast/config.backcast.yaml --config 'run={name: backcast-{{ year }}}' 'planning_horizons=[{{ year[:4] }}]' --resources entsoe=2 {{ snakemake_args }}", args = [{ arg = "year", default = "2023" }, { arg = "snakemake_args", default = "" }] }
 
 reset = """bash -c '
     read -p "Do you really wanna continue? This will remove all contents of \

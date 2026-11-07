@@ -42,7 +42,7 @@ from scripts._helpers import (
     rename_techs,
     update_p_nom_max,
 )
-from scripts.lib.conventional import cap_fuel_price
+from scripts.lib.conventional import cap_fuel_price, step_fuel_price
 
 if PYPSA_V1:
     pypsa.options.params.add.return_names = True
@@ -592,6 +592,7 @@ def attach_conventional_generators(
     conventional_inputs: dict,
     unit_commitment: pd.DataFrame = None,
     fuel_price: pd.DataFrame = None,
+    gas_price: pd.DataFrame = None,
 ):
     """
     Attach conventional generators to the network.
@@ -618,6 +619,9 @@ def attach_conventional_generators(
         DataFrame containing unit commitment data, by default None.
     fuel_price : pd.DataFrame, optional
         DataFrame containing fuel price data, by default None.
+    gas_price : pd.DataFrame, optional
+        Gas price per snapshot and hub, replacing the gas price of
+        `fuel_price` for CCGT and OCGT, by default None.
     """
     if ppl.empty:
         return
@@ -655,9 +659,22 @@ def attach_conventional_generators(
         fuel_price = fuel_price.assign(**costs.fuel[missing_carriers])
         fuel_price = fuel_price.reindex(ppl.carrier, axis=1)
         fuel_price.columns = ppl.index
+        countries = ppl.bus.map(n.buses.country)
+        if gas_price is not None:
+            daily = conventional_params["daily_gas_price"]
+            gas = ppl.index[ppl.carrier.isin(["CCGT", "OCGT"])]
+            hub = countries[gas].map(daily["hubs"])
+            if daily["default_hub"] is not None:
+                hub = hub.fillna(daily["default_hub"])
+            # Without a default hub, generators outside `hubs` keep the monthly price.
+            hub = hub.dropna()
+            fuel_price[hub.index] = gas_price[hub].to_numpy()
+            logger.info(
+                f"Set the daily gas price of {len(hub)} of {len(gas)} gas generators from the hubs "
+                f"{hub.value_counts().to_dict()}."
+            )
         gas_cap = conventional_params["gas_price_cap"]
         if gas_cap["enable"]:
-            countries = ppl.bus.map(n.buses.country)
             capped = ppl.index[
                 ppl.carrier.isin(["CCGT", "OCGT"])
                 & countries.isin(gas_cap["countries"])
@@ -670,6 +687,18 @@ def attach_conventional_generators(
                 f"Capped the gas price of {len(capped)} generators in "
                 f"{gas_cap['countries']}."
             )
+        for carrier, prices in conventional_params.get(
+            "country_fuel_price", {}
+        ).items():
+            for country, price in prices.items():
+                selected = ppl.index[ppl.carrier.eq(carrier) & countries.eq(country)]
+                assert not selected.empty, (
+                    f"No {carrier} generators in {country} for conventional: country_fuel_price."
+                )
+                fuel_price[selected] = step_fuel_price(fuel_price[selected], price)
+                logger.info(
+                    f"Set the {carrier} price of {len(selected)} generators in {country}."
+                )
         marginal_cost = fuel_price.div(ppl.efficiency).add(ppl.carrier.map(costs.VOM))
     else:
         marginal_cost = ppl.marginal_cost
@@ -978,12 +1007,44 @@ def attach_renewable_powerplants(
         n.generators.update({"p_nom_min": caps.dropna()})
 
 
+def read_irenastat(fn: str | None = None) -> pd.DataFrame:
+    """
+    Read the IRENASTAT capacities with two-letter country codes.
+
+    Without `fn`, the file bundled with powerplantmatching is used. Otherwise
+    `fn` is read, a compilation in the layout of powerplantmatching v0.9,
+    whose technology names are mapped to those of the bundled file.
+    """
+    if fn is None:
+        return pm.data.IRENASTAT().powerplant.convert_country_to_alpha2()
+
+    df = pd.read_csv(fn, comment="#", quotechar='"').rename(
+        columns={
+            "Electricity capacity statistics": "Capacity",
+            "Country/area": "Country",
+            "Grid connection": "Grid",
+        }
+    )
+    df["Technology"] = df.Technology.replace(
+        {
+            "Solar photovoltaic": "PV",
+            "Solar thermal energy": "CSP",
+            "Onshore wind energy": "Onshore",
+            "Offshore wind energy": "Offshore",
+            "Pumped hydro": "Pumped Storage",
+        }
+    )
+    df = pm.utils.convert_to_short_name(df).dropna(subset="Capacity")
+    return df.powerplant.convert_country_to_alpha2()
+
+
 def estimate_renewable_capacities(
     n: pypsa.Network,
     year: int,
     tech_map: dict,
     expansion_limit: bool,
     countries: list,
+    irenastat_fn: str | None = None,
 ):
     """
     Estimate a different between renewable capacities in the network and
@@ -998,6 +1059,7 @@ def estimate_renewable_capacities(
     - tech_map: A dictionary mapping fuel types to carrier names.
     - expansion_limit: Boolean value from config file
     - countries: A list of country codes to estimate capacities for.
+    - irenastat_fn: IRENASTAT file to use instead of the one bundled with powerplantmatching.
 
     Returns:
     - None
@@ -1005,7 +1067,7 @@ def estimate_renewable_capacities(
     if not len(countries) or not len(tech_map):
         return
 
-    capacities = pm.data.IRENASTAT().powerplant.convert_country_to_alpha2()
+    capacities = read_irenastat(irenastat_fn)
     capacities = capacities.query(
         "Year == @year and Technology in @tech_map and Country in @countries"
     )
@@ -1313,6 +1375,13 @@ def main(
     else:
         fuel_price = None
 
+    if params.conventional["daily_gas_price"]["enable"]:
+        gas_price = pd.read_csv(inputs.gas_price, index_col=0, parse_dates=True)
+        gas_price = gas_price.reindex(n.snapshots)
+        assert gas_price.notna().all().all(), "Daily gas prices miss snapshots."
+    else:
+        gas_price = None
+
     attach_conventional_generators(
         n,
         costs,
@@ -1324,6 +1393,7 @@ def main(
         conventional_inputs=conventional_inputs,
         unit_commitment=unit_commitment,
         fuel_price=fuel_price,
+        gas_price=gas_price,
     )
 
     attach_wind_and_solar(
@@ -1367,7 +1437,12 @@ def main(
 
             if estimate_renewable_caps["from_irenastat"]:
                 estimate_renewable_capacities(
-                    n, year, tech_map, expansion_limit, params.countries
+                    n,
+                    year,
+                    tech_map,
+                    expansion_limit,
+                    params.countries,
+                    inputs.get("irenastat_capacities") or None,
                 )
 
     update_p_nom_max(n)

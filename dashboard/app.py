@@ -39,9 +39,16 @@ RENDER: dict[str, Callable[[Context], None]] = dict(
 )
 
 
-@st.cache_data
+@st.cache_resource(max_entries=2)
 def cached_run(name: str) -> data.RunData:
+    """Extract of a run, one copy shared by all sessions that must not be modified."""
     return data.load_run(data.CACHE / name)
+
+
+@st.cache_resource
+def cached_prices(name: str) -> data.RunPrices:
+    """Prices of a run, one copy shared by all sessions that must not be modified."""
+    return data.load_prices(data.CACHE / name)
 
 
 @st.cache_data
@@ -75,7 +82,7 @@ def resolve_aggregation(choice: str, hours: pd.DatetimeIndex) -> str:
 
 
 def period_hours(
-    run: data.RunData, dates: tuple[pd.Timestamp, pd.Timestamp] | None
+    run: data.RunPrices, dates: tuple[pd.Timestamp, pd.Timestamp] | None
 ) -> pd.DatetimeIndex:
     """Hours of the selected period preset in the year of a run."""
     return data.period_index(
@@ -84,9 +91,9 @@ def period_hours(
 
 
 def reference(
-    run: data.RunData, dates: tuple[pd.Timestamp, pd.Timestamp] | None
+    run: data.RunPrices, dates: tuple[pd.Timestamp, pd.Timestamp] | None
 ) -> Reference:
-    """Validation run over the same period preset, custom dates moved to its year."""
+    """Run of another year over the same period preset, custom dates moved to its year."""
     moved = None if dates is None else tuple(d.replace(year=run.year) for d in dates)
     hours = period_hours(run, moved)
     return Reference(run, hours, period_label(st.session_state.period, hours))
@@ -98,7 +105,7 @@ def normalise(runs: list[str]) -> data.RunData:
     if state.page not in PAGES:
         state.page = PAGES[0]
     if state.run_a not in runs:
-        state.run_a = runs[-1]
+        state.run_a = data.MAIN_RUN if data.MAIN_RUN in runs else runs[-1]
     run = cached_run(state.run_a)
     areas = list(run.buses.index)
     if state.area not in areas:
@@ -160,9 +167,9 @@ def sidebar(runs: list[str]) -> Context:
         aggregation=resolve_aggregation(st.session_state.agg or "auto", hours),
         colors=carrier_colors(),
         references=[
-            reference(cached_run(r), dates)
+            reference(cached_prices(r), dates)
             for r in runs
-            if cached_run(r).year != run.year
+            if cached_prices(r).year != run.year
         ],
     )
 

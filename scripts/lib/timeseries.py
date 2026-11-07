@@ -8,6 +8,12 @@ Shared helpers for gaps in observed time series.
 import pandas as pd
 
 
+def gap_lengths(series: pd.Series) -> pd.Series:
+    """Return the length of the gap each missing value belongs to, 0 where the value is present."""
+    na = series.isna()
+    return na.groupby((~na).cumsum()).transform("sum").where(na, 0)
+
+
 def fill_short_gaps(
     data: pd.DataFrame,
     max_interpolate: int,
@@ -15,8 +21,7 @@ def fill_short_gaps(
     max_gap_by_column: dict[str, int] | None = None,
 ) -> pd.DataFrame:
     """Interpolate gaps up to `max_interpolate` steps, keep gaps up to `max_gap` (or the column specific `max_gap_by_column`) as NaN and raise on longer gaps."""
-    na = data.isna()
-    lengths = na.apply(lambda c: c.groupby((~c).cumsum()).transform("sum")).where(na, 0)
+    lengths = data.apply(gap_lengths)
     limits = pd.Series(max_gap_by_column or {}, dtype=int).reindex(
         data.columns, fill_value=max_gap
     )

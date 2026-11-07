@@ -231,14 +231,22 @@ rule make_summary:
         scripts("make_summary.py")
 
 
-def backcast_figure_files(names: list[str]) -> list[str]:
+def backcast_figure_files(names: list[str], run="{run}") -> list[str]:
     return expand(
-        RESULTS + "backcast/figures/{figure}.{ext}", figure=names, ext=["pdf", "png"]
+        RESULTS + "backcast/figures/{figure}.{ext}",
+        run=run,
+        figure=names,
+        ext=["pdf", "png"],
     )
 
 
 def backcast_network(w) -> str:
-    return RESULTS + f"networks/solved_{config_provider('planning_horizons')(w)[-1]}.nc"
+    horizon = config_provider("planning_horizons")(w)[-1]
+    assert [horizon] == snapshot_years(w), (
+        f"The planning horizon {horizon} of {w.run} is not its snapshot year. "
+        "Run `pixi run backcast <year>`, which sets `planning_horizons` to the year."
+    )
+    return RESULTS + f"networks/solved_{horizon}.nc"
 
 
 rule evaluate_price_backcast:
@@ -312,7 +320,9 @@ rule plot_backcast_system:
 rule backcast_figures:
     """Collects the benchmark figures of the day-ahead price backcast."""
     input:
-        backcast_figure_files(BACKCAST_PRICE_FIGURES + BACKCAST_SYSTEM_FIGURES),
+        backcast_figure_files(
+            BACKCAST_PRICE_FIGURES + BACKCAST_SYSTEM_FIGURES, run=config["run"]["name"]
+        ),
 
 
 rule plot_summary:

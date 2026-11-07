@@ -39,9 +39,30 @@ pixi run -e dashboard backcast-dashboard                       # streamlit run d
 ```
 
 - After code changes, `--rerun-triggers mtime --forcerun compose_network` avoids re-running the ENTSO-E downloads.
-- `config/backcast/config.backcast-2019-plain.yaml` is the unrefined 2019 reference.
+- The model shared by all years is `config/backcast/config.backcast.yaml`. Each year is a scenario `backcast-<year>` in `config/backcast/scenarios.yaml` with only the settings that differ by year.
+- `pixi run backcast 2019-plain` runs the unrefined 2019 reference.
 - Solver: Gurobi. The marginal cost spread makes the problem a QP (optimisation with a squared cost term).
 - Outputs: `results/backcast-<year>/backcast/{price_metrics.csv, price_monthly_bias.csv, price_evaluation.pdf, figures/}`.
+
+## Adding a backcast year
+
+Weather cutouts (`europe-<year>-sarah3-era5`) exist for 2019 to 2025, so these are the years that can be backcast. The IRENA capacities in powerplantmatching and the EIA hydro statistics in `data/eia_hydro_annual_generation.csv` end in 2024.
+The years are scenarios of one model (PyPSA-Eur [scenario management](https://pypsa-eur.readthedocs.io/en/latest/configuration/#run_cf)).
+The model shared by all years is `config/backcast/config.backcast.yaml`, so a model change applies to every year.
+Each year is an entry `backcast-<year>` in `config/backcast/scenarios.yaml` that holds only what differs by year.
+`pixi run backcast <year>` selects the scenario and sets `planning_horizons` to the year, which a scenario cannot change.
+
+1. Copy the entry of the closest year and replace the year in the snapshots, cutout, `powerplants_filter`, `custom_powerplants`, `estimate_renewable_capacities: year` and `estimate_efficiencies: reference_year`.
+2. Set the bidding zones: before 2021 `backcast: area_to_bus: data/entsoe_area_to_bus-pre2021.csv` and `borders: data/entsoe_borders-pre2021.csv` (Rossano instead of Calabria), from 2021 the defaults.
+3. Set the year facts and cite each source in a comment:
+   `exclude_price_areas` (areas without EUR prices or markets), `exclude_generation_areas`,
+   `fixed_border_capacities` (interconnectors commissioned during or after the year),
+   `wind_target_twh` (GB from DUKES minus Northern Ireland wind), `wind_curtailment_twh` (DE_LU from the BNetzA Monitoringbericht),
+   `nuclear_phase_out`, `conventional: gas_price_cap` (ES and PT from 2022-06-15 to 2023-12-31) and `conventional: daily_gas_price` (THE from 2021-10, MIBGAS for ES and PT).
+   From 2024 set `load: supplement_synthetic: false`, as the synthetic load ends in 2023.
+4. Run `pytest test/test_backcast_configs.py`, which checks every scenario against the schema, its year and the area map, then `pixi run backcast <year>`.
+   Missing ENTSO-E data stops the build with the area or border to add to the exclude lists, `fixed_border_capacities` or `wind_calibration_exclude`.
+   Borders whose capacity source ends within the year can use `backcast: exchange_proxy_fallback`. Wind calibration factors just outside `wind_calibration_factor_bounds` that match the other years (e.g. AT onwind about 2, DK_2 onwind about 0.4) can widen the bounds of that year.
 
 ## Dashboard
 
@@ -65,6 +86,8 @@ gh release upload dashboard-data dashboard-cache.tar.gz --clobber -R open-energy
 
 Then reboot the app in the Streamlit Community Cloud settings: a running app keeps its downloaded data.
 Every run in `dashboard/cache/` is published, so remove local runs you do not want to share before packing.
+Publish only years merged into `master` (currently 2019 to 2024), each extracted from a run of `master`.
+The app opens on `backcast-2023`, the year the refinements were tuned on; the other cached years are shown beside it over the same period.
 
 ## Known limitations and open items
 

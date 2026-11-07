@@ -83,6 +83,7 @@ hotmaps_industrial_sites,version-1.1,archive,latest supported,2026-01-13,,https:
 hotmaps_industrial_sites,version-1.0,primary,not-supported,2025-12-02,Required renaming of country names to work with PyPSA-Eur. This was fixed in the latest version.,https://gitlab.com/hotmaps/industrial_sites/industrial_sites_Industrial_Database/-/raw/1.0/data/Industrial_Database.csv
 hotmaps_industrial_sites,unknown,primary,latest supported,2025-12-02,,https://gitlab.com/hotmaps/industrial_sites/industrial_sites_Industrial_Database/-/raw/master/data/Industrial_Database.csv
 instrat_co2_prices,unknown,primary,latest supported,2026-02-03,API endpoint provides latest data without versioning,https://energy-api.instrat.pl/api/prices/co2?all=1
+irenastat_capacities,2000-2025,primary,latest supported,2026-11-02,"IRENASTAT renewable capacities 2000-2025 (IRENASTAT 2026 H1 release), compiled for powerplantmatching v0.9",https://tubcloud.tu-berlin.de/s/qALFkR8eB73FWA9/download/IRENASTAT_capacities_2000-2025.csv
 jrc_ardeco,2021,primary,latest supported,2025-12-02,,https://territorial.ec.europa.eu/ardeco-api-v2/rest/export/
 jrc_ardeco,2021,archive,latest supported,2026-01-13,,https://data.pypsa.org/workflows/eur/jrc_ardeco/2021
 jrc_energy_atlas,unknown,primary,latest supported,2026-02-02,,https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/EIGL-Data/RASTER/electricity_tot_demand_2019.tif
@@ -95,6 +96,7 @@ lau_regions,2019,primary,latest supported,2025-12-02,,https://gisco-services.ec.
 lau_regions,2019,archive,latest supported,2026-01-13,,https://data.pypsa.org/workflows/eur/lau_regions/2019/ref-lau-2019-01m.geojson.zip
 luisa_land_cover,unknown,primary,latest supported,2025-12-02,,https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/LUISA/EUROPE/Basemaps/LandUse/2018/LATEST/LUISA_basemap_020321_50m.tif
 luisa_land_cover,2021-03-02,archive,latest supported,2026-01-13,,https://data.pypsa.org/workflows/eur/luisa_land_cover/2021-03-02/LUISA_basemap_020321_50m.tif
+mibgas_gas_prices,unknown,primary,latest supported,2026-10-28,"Annual MIBGAS data files, free use with attribution to MIBGAS. {year} is replaced inside retrieve.smk.",https://www.mibgas.es/en/file-access/MIBGAS_Data_{year}.xlsx?path=AGNO_{year}/XLS
 mobility_profiles,unknown,build,latest supported,2025-12-02,"Latest dataset built using BASt vehicle monitoring data. The URL is a template that is filled based on the config file, see the documentation for details.",https://www.bast.de/videos/{year}_{street_type}_S.zip
 mobility_profiles,2025-08-27,primary,latest supported,2025-12-02,New version recreating the dataset from the data bundle.,https://zenodo.org/records/16965042/files
 mobility_profiles,2025-08-27,archive,latest supported,2026-01-13,New version recreating the dataset from the data bundle.,https://data.pypsa.org/workflows/eur/mobility_profiles/2025-08-27
@@ -159,6 +161,7 @@ synthetic_electricity_demand,v2,archive,latest supported,2026-01-20,the primary 
 synthetic_electricity_demand,0.1.0,archive,deprecated might-work,2026-01-13,,https://data.pypsa.org/workflows/eur/synthetic_electricity_demand/0.1.0/demand_hourly.csv
 tabula_calculator,unknown,primary,latest supported,2026-09-02,Derived from the Calc.Set.Building sheet of the TABULA calculator workbook,https://episcope.eu/fileadmin/tabula/public/calc/tabula-calculator.xlsx
 tabula_calculator,2026-09-07,archive,latest supported,2026-09-07,Derived from the Calc.Set.Building sheet of the TABULA calculator workbook,https://data.pypsa.org/workflows/eur/tabula_calculator/2026-09-07/tabula-calculator.xlsx
+the_gas_prices,unknown,primary,latest supported,2026-10-28,"Trading Hub Europe DataExport API without versioning, from gas day 2021-10-01. The THE terms require consent for copying, so there is no archive.",https://api.tradinghub.eu/api/dataexport/xmlexport/PricesEnergyImbalance
 tyndp,2024,primary,latest supported,2025-12-02,,https://2024-data.entsos-tyndp-scenarios.eu/files/scenarios-inputs
 tyndp,2024,archive,latest supported,2026-01-13,,https://data.pypsa.org/workflows/eur/tyndp/2024
 wdpa,unknown,primary,latest supported,2025-12-02,"WDPA changes its URL every month, the URL here is used as a template and {bYYYY} is replaced inside the retrieve.smk.",https://d1gam3xoknrgr2.cloudfront.net/current/WDPA_{bYYYY}_Public_shp.zip

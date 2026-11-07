@@ -78,6 +78,29 @@ def test_aggregated_generation_drops_consumption_and_converts_to_utc():
     assert result.index.equals(index[:2].tz_convert("UTC"))
 
 
+def test_aggregated_generation_merges_mixed_periods():
+    plain = pd.DataFrame(
+        {"Nuclear": [1.0, 2.0], "Solar": [3.0, 4.0]},
+        index=pd.date_range("2020-09-30 22:00", periods=2, freq="h", tz="UTC"),
+    )
+    nested = pd.DataFrame(
+        [[5.0, 6.0, 0.5]],
+        index=pd.date_range("2020-10-01 00:00", periods=1, freq="h", tz="UTC"),
+        columns=pd.MultiIndex.from_tuples(
+            [
+                ("Nuclear", "Actual Aggregated"),
+                ("Solar", "Actual Aggregated"),
+                ("Solar", "Actual Consumption"),
+            ]
+        ),
+    )
+    raw = pd.concat([plain, nested])
+    result = aggregated_generation(raw, pd.Timestamp("2021-01-01", tz="UTC"))
+    assert result.columns.tolist() == ["Nuclear", "Solar"]
+    np.testing.assert_allclose(result.Nuclear, [1, 2, 5])
+    np.testing.assert_allclose(result.Solar, [3, 4, 6])
+
+
 def test_hourly_carrier_generation_maps_production_types():
     index = pd.date_range("2023-01-01", periods=8, freq="15min", tz="UTC")
     raw = pd.DataFrame(
@@ -314,6 +337,47 @@ def test_apply_monthly_availability(network, observed, phase_out, expected):
     p_max_pu = network.get_switchable_as_dense("Generator", "p_max_pu")
     for gen in ["ES00 nuclear", "ESCE nuclear"]:
         np.testing.assert_allclose(p_max_pu[gen], expected)
+
+
+def test_apply_monthly_availability_keep_unpublished(network, caplog):
+    caplog.set_level("INFO")
+    apply_monthly_availability(
+        network,
+        frame({("ES", "onwind", "2023-01-01"): (1.0, 2)}),
+        AREA_TO_BUS,
+        "nuclear",
+        {},
+        {},
+        keep_unpublished=True,
+    )
+    p_max_pu = network.get_switchable_as_dense("Generator", "p_max_pu")
+    for gen in ["ES00 nuclear", "ESCE nuclear"]:
+        np.testing.assert_allclose(p_max_pu[gen], 0.9)
+    assert "No actual nuclear generation published for ['ES']" in caplog.text
+
+
+def test_apply_monthly_availability_exclude(network, caplog):
+    caplog.set_level("INFO")
+    apply_monthly_availability(
+        network,
+        frame(ES_NUCLEAR_JAN | {("ES", "nuclear", "2023-02-01"): (2000.0, 2)}),
+        AREA_TO_BUS,
+        "nuclear",
+        {},
+        {},
+        exclude=["ES"],
+    )
+    p_max_pu = network.get_switchable_as_dense("Generator", "p_max_pu")
+    for gen in ["ES00 nuclear", "ESCE nuclear"]:
+        np.testing.assert_allclose(p_max_pu[gen], 0.9)
+    assert "Excluded ['ES'] from the monthly nuclear availability" in caplog.text
+
+
+def test_apply_monthly_availability_exclude_raises(network):
+    with pytest.raises(AssertionError, match="Unknown ENTSO-E"):
+        apply_monthly_availability(
+            network, frame(ES_NUCLEAR_JAN), AREA_TO_BUS, "nuclear", {}, {}, exclude=["XX"]
+        )
 
 
 @pytest.mark.parametrize(

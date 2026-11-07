@@ -8,4 +8,4 @@ and emission price time series that enter the optimisation. Where the cost
 data comes from is described under
 [Techno-economic assumptions](../design/techno-economic-assumptions.md).
 
-{{ rules("process_cost_data", "build_co2_prices", "build_fossil_fuel_prices") }}
+{{ rules("process_cost_data", "build_co2_prices", "build_fossil_fuel_prices", "build_daily_gas_prices") }}
