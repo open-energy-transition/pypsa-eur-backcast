@@ -163,7 +163,7 @@ backcast-2021:
           "2021-01-01": 8.92
 
   backcast:
-    exclude_price_areas: [AL, BA, BG, GB, ME, MK, RO, XK]  # BG and RO day-ahead prices are published in BGN and RON in 2021
+    exclude_price_areas: [AL, BA, GB, ME, MK, XK]
     max_capacity_gap_hours: 744  # FI-NO_4 has no scheduled exchanges in January 2021, EE-FI, EE-LV, BG-GR, GR-MK and GB-IE_SEM have gaps of 3 to 13 days
     fixed_border_capacities:
       AL-XK: physical  # XK NTCs only from 2021-07-23
@@ -229,7 +229,7 @@ backcast-2022:
           "2022-01-01": 15.25
 
   backcast:
-    exclude_price_areas: [AL, BA, BG, GB, ME, MK, XK]  # BG day-ahead prices are published partly in BGN in 2022
+    exclude_price_areas: [AL, BA, GB, ME, MK, XK]
     fixed_border_capacities:
       BG-MK: physical  # no ENTSO-E capacity data before 2022-06-15
       DK_1-GB: 0

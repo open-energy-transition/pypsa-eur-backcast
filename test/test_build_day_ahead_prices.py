@@ -139,51 +139,71 @@ def rates(tmp_path):
     path = tmp_path / "eurofxref-hist.csv"
     path.write_text(
         "Date,PLN,BGN,\n"
-        "2019-01-07,4.0,1.95583,\n"
-        "2019-01-04,5.0,1.95583,\n"
-        "2019-01-03,N/A,1.95583,\n"
+        "2019-01-07,4.0,1.9558,\n"
+        "2019-01-04,5.0,1.9558,\n"
+        "2019-01-03,N/A,1.9558,\n"
     )
     return read_exchange_rates(path)
 
 
-def test_to_eur_uses_rate_of_day_or_last_before(rates):
-    index = pd.date_range("2019-01-04 22:00", "2019-01-07 01:00", freq="h")
+def currencies(codes: list[str], index: pd.DatetimeIndex) -> pd.Series:
+    return pd.Series(np.repeat(codes, len(index) // len(codes)), index)
+
+
+def test_to_eur_uses_rate_of_utc_day_or_last_before(rates):
+    index = pd.date_range("2019-01-04 23:00", "2019-01-07 02:00", freq="h", tz="CET")
     prices = pd.Series(100.0, index, name="PL")
 
-    result = to_eur(prices, "PLN", rates)
+    result = to_eur(prices, currencies(["PLN"], index), rates)
 
-    expected = np.where(index < "2019-01-07", 100 / 5.0, 100 / 4.0)
+    expected = np.where(index < pd.Timestamp("2019-01-07", tz="UTC"), 20.0, 25.0)
     np.testing.assert_allclose(result, expected)
     assert result.name == "PL"
 
 
-@pytest.mark.parametrize("currency, expected", [("EUR", 1.0), ("BGN", 1 / 1.95583)])
-def test_to_eur_passes_eur_and_converts_pegged_rate(rates, currency, expected):
-    prices = pd.Series(1.0, pd.date_range("2019-01-03", periods=2, freq="h"))
+@pytest.mark.parametrize(
+    "codes, expected",
+    [
+        (["EUR"], [1.0, 1.0]),
+        (["BGN"], [1 / 1.95583, 1 / 1.95583]),
+        (["BGN", "EUR"], [1 / 1.95583, 1.0]),
+    ],
+    ids=["eur", "bgn-peg", "bgn-to-eur"],
+)
+def test_to_eur_converts_per_price(rates, codes, expected):
+    index = pd.date_range("2019-01-03 23:00", periods=2, freq="h", tz="UTC")
+    prices = pd.Series(1.0, index)
 
-    np.testing.assert_allclose(to_eur(prices, currency, rates), expected)
+    np.testing.assert_allclose(
+        to_eur(prices, currencies(codes, index), rates), expected
+    )
 
 
 def test_to_eur_raises_without_rate(rates):
-    prices = pd.Series(1.0, pd.date_range("2019-01-03", periods=2, freq="h"))
+    index = pd.date_range("2019-01-03", periods=2, freq="h", tz="UTC")
+    prices = pd.Series(1.0, index)
 
     with pytest.raises(AssertionError, match="No ECB PLN rate"):
-        to_eur(prices, "PLN", rates)
+        to_eur(prices, currencies(["PLN"], index), rates)
 
 
-@pytest.mark.parametrize(
-    "content, currency",
-    [
-        ("utc_timestamp,PL,currency\n2019-01-01 00:00:00+00:00,200.0,PLN\n", "PLN"),
-        ("utc_timestamp,DE_LU\n2019-01-01 00:00:00+00:00,50.0\n", "EUR"),
-    ],
-    ids=["currency", "legacy"],
-)
-def test_read_prices(tmp_path, content, currency):
+def test_read_prices(tmp_path):
     path = tmp_path / "prices.csv"
-    path.write_text(content)
+    path.write_text(
+        "utc_timestamp,BG,currency\n"
+        "2022-01-21 22:00:00+00:00,200.0,BGN\n"
+        "2022-01-21 23:00:00+00:00,100.0,EUR\n"
+    )
 
-    prices, result = read_prices(path)
+    prices, currency = read_prices(path)
 
-    assert result == currency and isinstance(prices, pd.Series)
-    assert prices.index.tz is not None
+    assert currency.tolist() == ["BGN", "EUR"] and isinstance(prices, pd.Series)
+    assert currency.index.equals(prices.index) and prices.index.tz is not None
+
+
+def test_read_prices_raises_without_currency(tmp_path):
+    path = tmp_path / "prices.csv"
+    path.write_text("utc_timestamp,DE_LU\n2019-01-01 00:00:00+00:00,50.0\n")
+
+    with pytest.raises(AssertionError, match="No currency column"):
+        read_prices(path)
