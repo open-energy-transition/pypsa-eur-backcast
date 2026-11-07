@@ -5,9 +5,11 @@
 Retrieves the day-ahead electricity prices of one bidding zone and year from the ENTSO-E Transparency Platform.
 
 The prices are queried through the ENTSO-E API for the calendar year in UTC and
-stored in their native market time unit with UTC timestamps. An API token must
-be set in the environment variable ``ENTSOE_API_TOKEN``. The query fails if no data is published for the area and year
-or if any price is not given in EUR, e.g. in PLN, RON or BGN in 2019.
+stored in their native market time unit with UTC timestamps, together with the
+currency they are published in (e.g. PLN, RON, BGN or GBP in 2019). An API token
+must be set in the environment variable ``ENTSOE_API_TOKEN``. The query fails if
+no data is published for the area and year or if the prices of the year are
+given in more than one currency.
 """
 
 import logging
@@ -39,11 +41,12 @@ if __name__ == "__main__":
     client = entsoe_client()
     xml = EntsoeRawClient.query_day_ahead_prices(client, area, start=start, end=end)
     currencies = set(re.findall(r"<currency_Unit\.name>(\w+)<", xml))
-    assert currencies == {"EUR"}, (
-        f"Day-ahead prices of {area} in {year} are given in {sorted(currencies)}, not only EUR. Add {area} to backcast: exclude_price_areas."
+    assert len(currencies) == 1, (
+        f"Day-ahead prices of {area} in {year} are given in {sorted(currencies)}, not in one currency. Add {area} to backcast: exclude_price_areas."
     )
+    (currency,) = currencies
     prices = to_utc(
         client.query_day_ahead_prices(area, start=start, end=end), end, area
     )
 
-    prices.to_csv(snakemake.output.csv)
+    prices.to_frame().assign(currency=currency).to_csv(snakemake.output.csv)

@@ -209,6 +209,10 @@ class DataConfig(BaseModel):
         default_factory=lambda: _DataSourceConfig(source="primary"),
         description="MIBGAS daily gas prices data source configuration.",
     )
+    ecb_exchange_rates: _DataSourceConfig = Field(
+        default_factory=lambda: _DataSourceConfig(source="primary"),
+        description="ECB euro foreign exchange reference rates data source configuration.",
+    )
     irenastat_capacities: _DataSourceConfig = Field(
         default_factory=lambda: _DataSourceConfig(source="primary"),
         description="IRENASTAT renewable capacities data source configuration, used with `electricity: estimate_renewable_capacities: irenastat_source: retrieve`.",

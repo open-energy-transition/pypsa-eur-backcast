@@ -1522,6 +1522,9 @@ data:
   mibgas_gas_prices:
     source: primary
     version: latest
+  ecb_exchange_rates:
+    source: primary
+    version: latest
   irenastat_capacities:
     source: primary
     version: latest

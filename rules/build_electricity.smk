@@ -532,6 +532,7 @@ rule build_day_ahead_prices:
     """Builds hourly observed day-ahead prices per bus of the bidding zone clustered network."""
     input:
         prices=input_day_ahead_prices,
+        exchange_rates=f"{ECB_EXCHANGE_RATES_DATASET['folder']}/eurofxref-hist.csv",
         area_to_bus=config_provider("backcast", "area_to_bus"),
         network=resources("networks/clustered.nc"),
     output:
