@@ -17,6 +17,7 @@ API token must be set in the environment variable ``ENTSOE_API_TOKEN``.
 import logging
 
 import pandas as pd
+from entsoe import EntsoePandasClient
 from entsoe.exceptions import NoMatchingDataError
 
 from scripts._helpers import configure_logging, set_scenario_config
@@ -25,8 +26,8 @@ from scripts.lib.entsoe import entsoe_client, utc_year
 logger = logging.getLogger(__name__)
 
 QUERIES = {
-    "A80": "query_unavailability_of_generation_units",
-    "A77": "query_unavailability_of_production_units",
+    "A80": EntsoePandasClient.query_unavailability_of_generation_units,
+    "A77": EntsoePandasClient.query_unavailability_of_production_units,
 }
 COLUMNS = {
     "mrid": "mrid",
@@ -47,8 +48,7 @@ COLUMNS = {
 def outage_steps(outages: pd.DataFrame, doctype: str) -> pd.DataFrame:
     """Keep the outage steps with renamed columns and UTC timestamps."""
     steps = outages.reset_index(drop=True)[list(COLUMNS)].rename(columns=COLUMNS)
-    for column in ["start", "end"]:
-        steps[column] = pd.to_datetime(steps[column], utc=True)
+    steps[["start", "end"]] = steps[["start", "end"]].apply(pd.to_datetime, utc=True)
     steps["avail_qty"] = pd.to_numeric(steps["avail_qty"])
     return steps.assign(doctype=doctype)
 
@@ -72,11 +72,11 @@ if __name__ == "__main__":
     for doctype, query in QUERIES.items():
         logger.info(f"Querying unavailability ({doctype}) for {area} in {year}...")
         try:
-            outages = getattr(client, query)(area, start=start, end=end)
+            outages = query(client, area, start=start, end=end)
         except NoMatchingDataError:
             logger.warning(f"No unavailability ({doctype}) published for {area}.")
             continue
         steps.append(outage_steps(outages, doctype))
-    columns = [*COLUMNS.values(), "doctype"]
-    result = pd.concat(steps) if steps else pd.DataFrame(columns=columns)
-    result[columns].to_csv(snakemake.output.csv, index=False)
+    empty = pd.DataFrame(columns=[*COLUMNS.values(), "doctype"])
+    result = pd.concat(steps) if steps else empty
+    result.to_csv(snakemake.output.csv, index=False)

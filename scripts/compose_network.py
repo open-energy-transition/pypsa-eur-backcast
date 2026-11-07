@@ -128,12 +128,14 @@ def apply_backcast(
             exclude=backcast["monthly_availability_exclude"].get(carrier, []),
         )
     if unavailability["enable"]:
+        share = pd.read_csv(
+            inputs.unavailability, index_col=0, header=[0, 1], parse_dates=True
+        )
+        coverage = pd.read_csv(inputs.unavailability_coverage, index_col=[0, 1])
         apply_unavailability(
             n,
-            pd.read_csv(
-                inputs.unavailability, index_col=0, header=[0, 1], parse_dates=True
-            ),
-            pd.read_csv(inputs.unavailability_coverage, index_col=[0, 1]),
+            share,
+            coverage,
             area_to_bus,
             unavailability["min_coverage"],
             backcast["nuclear_phase_out"],

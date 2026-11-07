@@ -179,19 +179,16 @@ def match_production_units(
     by_code = pd.Series(codes.index, index=codes.values)
     by_code = by_code[by_code.index.isin(units.index)]
     candidates = ppl.drop(by_code.unique())
+    unmatched = units.drop(by_code.index.unique())
+    unmatched = unmatched[unmatched.plant_type.isin(NAME_MATCH_FUELTYPES)]
     matches = [by_code]
-    for code, unit in units.drop(by_code.index.unique()).iterrows():
-        fueltypes = NAME_MATCH_FUELTYPES.get(unit.plant_type)
-        if not fueltypes:
-            continue
-        pool = candidates.query("area == @unit.area and carrier in @fueltypes")
-        pool = pool[
-            (pool.p_nom - unit.capacity).abs() <= capacity_tolerance * unit.capacity
-        ]
-        pool = pool.assign(
-            score=pool.name.map(lambda name: name_score(unit.names, name)),
-            gap=(pool.p_nom - unit.capacity).abs(),
-        ).query("score >= @min_name_score")
+    for code, unit in unmatched.iterrows():
+        same_fuel = candidates.carrier.isin(NAME_MATCH_FUELTYPES[unit.plant_type])
+        pool = candidates[(candidates.area == unit.area) & same_fuel]
+        pool = pool.assign(gap=(pool.p_nom - unit.capacity).abs())
+        pool = pool[pool.gap <= capacity_tolerance * unit.capacity]
+        score = pool.name.map(lambda name: name_score(unit.names, name))
+        pool = pool.assign(score=score).query("score >= @min_name_score")
         if pool.empty:
             continue
         best = pool.sort_values(["score", "gap"], ascending=[False, True]).index[0]
@@ -214,14 +211,15 @@ def production_units(steps: pd.DataFrame) -> pd.DataFrame:
     """
     nominal = steps.groupby(["production_resource_id", "unit_name"], dropna=False)
     capacity = nominal.nominal_power.max().groupby(level=0).sum()
-    first = steps.groupby("production_resource_id")[["area", "plant_type"]].first()
-    names = steps.groupby("production_resource_id").apply(
+    by_unit = steps.groupby("production_resource_id")
+    names = by_unit.apply(
         lambda s: [
             *s.production_resource_name.dropna().unique(),
             *s.unit_name.dropna().unique(),
         ],
         include_groups=False,
     )
+    first = by_unit[["area", "plant_type"]].first()
     return first.assign(capacity=capacity, names=names)
 
 
@@ -257,10 +255,8 @@ def unavailable_share(
     """
     ppl = ppl[ppl.carrier.isin(carriers)]
     matches = matches[matches.isin(ppl.index)]
-    weight = (
-        ppl.p_nom[matches.values].values
-        / ppl.p_nom[matches.values].groupby(matches.index).transform("sum").values
-    )
+    p_nom = ppl.p_nom[matches.values]
+    weight = p_nom.values / p_nom.groupby(matches.index).transform("sum").values
     plants = pd.DataFrame(
         unavailable.reindex(columns=matches.index, fill_value=0.0).values * weight,
         index=unavailable.index,
@@ -272,13 +268,9 @@ def unavailable_share(
     capacity = ppl.groupby(["bus", "carrier"]).p_nom.sum()
     share = plants.T.groupby([groups.bus, groups.carrier]).sum().T
     share = share.reindex(columns=capacity.index, fill_value=0.0) / capacity
-    matched = ppl.index.isin(matches.values)
-    coverage = pd.DataFrame(
-        {
-            "capacity": ppl.groupby(["area", "carrier"]).p_nom.sum(),
-            "matched": ppl[matched].groupby(["area", "carrier"]).p_nom.sum(),
-        }
-    ).fillna(0.0)
+    matched = ppl.p_nom.where(ppl.index.isin(matches.values), 0.0)
+    totals = ppl.assign(capacity=ppl.p_nom, matched=matched)
+    coverage = totals.groupby(["area", "carrier"])[["capacity", "matched"]].sum()
     coverage["coverage"] = coverage.matched / coverage.capacity
     return share, coverage
 

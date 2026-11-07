@@ -24,6 +24,10 @@ HOURS = pd.date_range("2023-01-01", periods=4, freq="h")
 AREA_TO_BUS = pd.Series({"DE00": "DE_LU", "FI00": "FI"})
 
 
+def utc(time: str) -> pd.Timestamp:
+    return pd.Timestamp(f"2023-01-01 {time}", tz="UTC")
+
+
 def step(**kwargs) -> dict:
     defaults = dict(
         doctype="A80",
@@ -36,8 +40,8 @@ def step(**kwargs) -> dict:
         plant_type="Fossil Gas",
         nominal_power=100.0,
         avail_qty=0.0,
-        start=pd.Timestamp("2023-01-01 00:00", tz="UTC"),
-        end=pd.Timestamp("2023-01-01 02:00", tz="UTC"),
+        start=utc("00:00"),
+        end=utc("02:00"),
         area="DE_LU",
     )
     return {**defaults, **kwargs}
@@ -45,10 +49,6 @@ def step(**kwargs) -> dict:
 
 def steps(*rows: dict) -> pd.DataFrame:
     return pd.DataFrame(list(rows))
-
-
-def utc(time: str) -> pd.Timestamp:
-    return pd.Timestamp(f"2023-01-01 {time}", tz="UTC")
 
 
 @pytest.fixture
@@ -248,16 +248,19 @@ def network() -> pypsa.Network:
     return n
 
 
+def share_and_coverage(
+    hours: pd.DatetimeIndex, coverage: dict[tuple[str, str], float]
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    columns = pd.MultiIndex.from_tuples(coverage)
+    areas = pd.MultiIndex.from_tuples([(AREA_TO_BUS[b], c) for b, c in coverage])
+    share = pd.DataFrame(0.2, index=hours, columns=columns)
+    return share, pd.DataFrame({"coverage": list(coverage.values())}, index=areas)
+
+
 def test_apply_unavailability(network):
-    columns = pd.MultiIndex.from_tuples(
-        [("DE00", "CCGT"), ("DE00", "nuclear"), ("FI00", "nuclear")]
-    )
-    share = pd.DataFrame(0.2, index=HOURS, columns=columns)
-    coverage = pd.DataFrame(
-        {"coverage": [0.5, 1.0, 0.5]},
-        index=pd.MultiIndex.from_tuples(
-            [("DE_LU", "CCGT"), ("DE_LU", "nuclear"), ("FI", "nuclear")]
-        ),
+    share, coverage = share_and_coverage(
+        HOURS,
+        {("DE00", "CCGT"): 0.5, ("DE00", "nuclear"): 1.0, ("FI00", "nuclear"): 0.5},
     )
     apply_unavailability(
         network,
@@ -274,11 +277,6 @@ def test_apply_unavailability(network):
 
 
 def test_apply_unavailability_requires_all_snapshots(network):
-    share = pd.DataFrame(
-        0.2, index=HOURS[:2], columns=pd.MultiIndex.from_tuples([("DE00", "CCGT")])
-    )
-    coverage = pd.DataFrame(
-        {"coverage": [1.0]}, index=pd.MultiIndex.from_tuples([("DE_LU", "CCGT")])
-    )
+    share, coverage = share_and_coverage(HOURS[:2], {("DE00", "CCGT"): 1.0})
     with pytest.raises(AssertionError, match="all snapshots"):
         apply_unavailability(network, share, coverage, AREA_TO_BUS, {}, {})
