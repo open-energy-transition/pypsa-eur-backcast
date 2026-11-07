@@ -10,13 +10,15 @@ virtual trading point (``VTPDailyAveragePrice``), published from gas day
 Both are in nominal EUR/MWh. Each gas day runs from 06:00 to 06:00 CET/CEST and
 is assigned to the snapshots (naive UTC) it covers. The gas day before the
 first snapshot day is not retrieved, so the first hours take the first
-available price.
+available price. Snapshots before the first published gas day of a hub get no
+price and keep the monthly gas price in ``add_electricity``.
 """
 
 import logging
 import re
 import xml.etree.ElementTree as ET
 
+import numpy as np
 import pandas as pd
 
 from scripts._helpers import configure_logging, get_snapshots, set_scenario_config
@@ -25,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 GAS_DAY_START_HOUR = 6
 GAS_DAY_TIMEZONE = "Europe/Berlin"
+PUBLISHED_FROM = {"THE": pd.Timestamp("2021-10-01")}
 
 
 def read_the_prices(fn: str) -> pd.Series:
@@ -66,17 +69,27 @@ def gas_days(snapshots: pd.DatetimeIndex) -> pd.DatetimeIndex:
     return pd.DatetimeIndex(shifted.tz_localize(None).normalize())
 
 
-def hourly_gas_price(daily: pd.Series, snapshots: pd.DatetimeIndex) -> pd.Series:
-    """Assign daily gas prices to snapshots, filling only the gas day before the first snapshot day."""
+def hourly_gas_price(
+    daily: pd.Series,
+    snapshots: pd.DatetimeIndex,
+    published_from: pd.Timestamp | None = None,
+) -> pd.Series:
+    """Assign daily gas prices to snapshots, filling only the gas day before the first snapshot day, without a price before the first published gas day."""
     days = gas_days(snapshots)
     first = snapshots[0].normalize()
+    if published_from is not None:
+        first = max(first, published_from)
     missing = days.unique().difference(daily.index)
     assert missing[missing >= first].empty, (
         f"Missing daily gas prices for {missing[missing >= first].strftime('%Y-%m-%d').tolist()}."
     )
-    price = daily.reindex(days).bfill()
-    assert price.notna().all(), "No daily gas price on the first snapshot day."
-    return pd.Series(price.to_numpy(), index=snapshots)
+    price = daily.reindex(days).bfill().to_numpy(copy=True)
+    if published_from is not None:
+        price[days < published_from] = np.nan
+    assert not np.isnan(price[days >= first]).any(), (
+        "No daily gas price on the first snapshot day."
+    )
+    return pd.Series(price, index=snapshots)
 
 
 READERS = {"THE": read_the_prices, "MIBGAS": read_mibgas_prices}
@@ -100,10 +113,11 @@ if __name__ == "__main__":
             continue
         daily = pd.concat([reader(fn) for fn in snakemake.input[hub]])
         daily = daily[~daily.index.duplicated(keep="last")].sort_index()
-        hourly[hub] = hourly_gas_price(daily, snapshots)
+        hourly[hub] = hourly_gas_price(daily, snapshots, PUBLISHED_FROM.get(hub))
         logger.info(
             f"{hub} gas price in EUR/MWh: mean {hourly[hub].mean():.1f}, "
-            f"min {hourly[hub].min():.1f}, max {hourly[hub].max():.1f}."
+            f"min {hourly[hub].min():.1f}, max {hourly[hub].max():.1f}, "
+            f"{hourly[hub].isna().sum()} hours before the first published gas day."
         )
 
     pd.DataFrame(hourly).rename_axis("snapshot").to_csv(snakemake.output.gas_price)
