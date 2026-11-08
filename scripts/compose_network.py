@@ -61,7 +61,11 @@ from scripts.lib.cross_border import (
     external_net_imports,
     raise_to_physical,
 )
-from scripts.lib.entsoe import assert_known_areas, read_area_to_bus
+from scripts.lib.entsoe import (
+    assert_known_areas,
+    read_area_to_bus,
+    read_hourly_generation,
+)
 from scripts.lib.unavailability import apply_unavailability
 from scripts.prepare_network import (
     apply_co2_budget_constraints,
@@ -81,7 +85,11 @@ SECTOR_RENEWABLE_CARRIERS = {"solar rooftop"}
 
 
 def apply_backcast(
-    n: pypsa.Network, inputs: InputFiles, electricity: dict, backcast: dict
+    n: pypsa.Network,
+    inputs: InputFiles,
+    area_to_bus: pd.Series | None,
+    electricity: dict,
+    backcast: dict,
 ) -> None:
     """Apply the ENTSO-E cross-border capacities and the backcast calibration."""
     ntc = electricity["cross_border_capacities"] == "ntc"
@@ -92,7 +100,7 @@ def apply_backcast(
     unavailability = backcast["unavailability"]
     if not (ntc or wind or solar or nuclear or carriers or unavailability["enable"]):
         return
-    area_to_bus = read_area_to_bus(inputs.area_to_bus)
+    assert area_to_bus is not None
     if ntc:
         capacities = pd.read_csv(
             inputs.cross_border_capacities, index_col=0, parse_dates=True
@@ -167,10 +175,13 @@ def apply_backcast(
 
 
 def apply_external_flows(
-    n: pypsa.Network, inputs: InputFiles, areas: list[str], source: str
+    n: pypsa.Network,
+    inputs: InputFiles,
+    area_to_bus: pd.Series,
+    areas: list[str],
+    source: str,
 ) -> None:
     """Add the hourly exchanges with the external `areas` as fixed flows at their border buses."""
-    area_to_bus = read_area_to_bus(inputs.area_to_bus)
     borders = pd.read_csv(inputs.external_borders)
     unknown = sorted(set(areas) - set(borders.external_area))
     assert not unknown, f"backcast: external_flows: areas without border: {unknown}"
@@ -179,14 +190,6 @@ def apply_external_flows(
     data = read_retrieved(inputs.external_exchanges)
     net_imports = external_net_imports(data, borders, n.snapshots, source)
     add_external_flows(n, net_imports, borders, area_to_bus)
-
-
-def read_observed_generation(inputs: InputFiles) -> tuple[pd.DataFrame, pd.Series]:
-    """Read the hourly ENTSO-E generation per area and carrier and the area-to-bus map."""
-    generation = pd.read_csv(
-        inputs.entsoe_generation_hourly, index_col=0, header=[0, 1], parse_dates=True
-    )
-    return generation, read_area_to_bus(inputs.area_to_bus)
 
 
 if __name__ == "__main__":
@@ -229,12 +232,14 @@ if __name__ == "__main__":
 
     add_electricity_components(n, inputs, params, costs)
 
-    apply_backcast(n, inputs, params.electricity, params.backcast)
+    area_to_bus = read_area_to_bus(inputs.area_to_bus) if inputs.area_to_bus else None
+    apply_backcast(n, inputs, area_to_bus, params.electricity, params.backcast)
 
     external_flows = params.backcast["external_flows"]
     if external_flows["enable"]:
+        assert area_to_bus is not None
         apply_external_flows(
-            n, inputs, external_flows["areas"], external_flows["source"]
+            n, inputs, area_to_bus, external_flows["areas"], external_flows["source"]
         )
 
     if sector_mode:
@@ -285,23 +290,24 @@ if __name__ == "__main__":
     observed_spread = spread["enable"] and spread["reference"] == "observed"
     budget_carriers = backcast["energy_budget_carriers"]
     if observed_spread or backcast["nuclear_min_output"] or budget_carriers:
-        generation, area_to_bus = read_observed_generation(inputs)
-    if backcast["nuclear_min_output"]:
-        apply_nuclear_min_output(
-            n,
-            generation,
-            area_to_bus,
-            backcast["nuclear_area_map"],
-            backcast["nuclear_load_following"],
-        )
-    for carrier in budget_carriers:
-        apply_energy_budget(
-            n,
-            generation,
-            area_to_bus,
-            carrier,
-            backcast["monthly_availability_exclude"].get(carrier, []),
-        )
+        assert area_to_bus is not None
+        generation = read_hourly_generation(inputs.entsoe_generation_hourly)
+        if backcast["nuclear_min_output"]:
+            apply_nuclear_min_output(
+                n,
+                generation,
+                area_to_bus,
+                backcast["nuclear_area_map"],
+                backcast["nuclear_load_following"],
+            )
+        for carrier in budget_carriers:
+            apply_energy_budget(
+                n,
+                generation,
+                area_to_bus,
+                carrier,
+                backcast["monthly_availability_exclude"].get(carrier, []),
+            )
 
     clip_p_min_pu(n)
     if spread["enable"]:
@@ -311,6 +317,7 @@ if __name__ == "__main__":
         )
         observed = (None, None)
         if observed_spread:
+            assert area_to_bus is not None
             exclude = spread["exclude_areas"]
             assert_known_areas(
                 exclude, area_to_bus, "conventional.marginal_cost_spread.exclude_areas"

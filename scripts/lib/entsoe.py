@@ -38,6 +38,11 @@ def read_area_to_bus(path: str) -> pd.Series:
     return pd.read_csv(path, index_col="bus")["entsoe_area"]
 
 
+def read_hourly_generation(path: str) -> pd.DataFrame:
+    """Read the hourly actual generation in MW with area and carrier columns."""
+    return pd.read_csv(path, index_col=0, header=[0, 1], parse_dates=True)
+
+
 def assert_known_areas(areas: Iterable[str], area_to_bus: pd.Series, key: str) -> None:
     """Assert that the configured `areas` of `key` are ENTSO-E areas of the bus map."""
     unknown = sorted(set(areas) - set(area_to_bus))

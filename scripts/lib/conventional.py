@@ -211,13 +211,7 @@ def apply_chp_floor(
         columns=replaced, errors="ignore"
     )
     p_min_pu = n.get_switchable_as_dense("Generator", "p_min_pu", inds=covered)
-    n.generators_t.p_min_pu = pd.concat(
-        [
-            n.generators_t.p_min_pu.drop(columns=covered, errors="ignore"),
-            np.maximum(p_min_pu, share),
-        ],
-        axis=1,
-    )
+    set_switchable(n, "p_min_pu", np.maximum(p_min_pu, share))
     logger.info(
         f"Applied the CHP floor to {len(covered)} generators in {len(p_nom)} country and fuel groups."
     )

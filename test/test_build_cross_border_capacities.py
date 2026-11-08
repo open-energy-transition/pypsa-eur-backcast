@@ -519,12 +519,14 @@ def test_external_net_imports_fails(data, match):
 def test_apply_external_flows_fails_on_unknown_area(tmp_path):
     borders = tmp_path / "borders.csv"
     EXTERNAL_BORDERS.to_csv(borders, index=False)
-    area_to_bus = tmp_path / "area_to_bus.csv"
-    AREA_TO_BUS.rename_axis("bus").rename("entsoe_area").to_csv(area_to_bus)
-    inputs = SimpleNamespace(area_to_bus=area_to_bus, external_borders=borders)
+    inputs = SimpleNamespace(external_borders=borders)
     with pytest.raises(AssertionError, match="MA"):
         apply_external_flows(
-            pypsa.Network(), inputs, ["UA", "MA"], "scheduled_exchange_total"
+            pypsa.Network(),
+            inputs,
+            AREA_TO_BUS,
+            ["UA", "MA"],
+            "scheduled_exchange_total",
         )
 
 

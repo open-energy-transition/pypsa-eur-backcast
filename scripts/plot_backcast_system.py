@@ -49,7 +49,7 @@ from scripts.lib.backcast_plotting import (
     separate_groups,
     symmetric_limit,
 )
-from scripts.lib.entsoe import read_area_to_bus
+from scripts.lib.entsoe import read_area_to_bus, read_hourly_generation
 
 DECOUPLING_SPREAD = 1.0
 OUTLIER_LABELS = 10
@@ -447,9 +447,7 @@ if __name__ == "__main__":
     monthly = pd.read_csv(
         snakemake.input.generation, index_col=[0, 1, 2], parse_dates=["month"]
     )
-    hourly = pd.read_csv(
-        snakemake.input.generation_hourly, index_col=0, header=[0, 1], parse_dates=True
-    )
+    hourly = read_hourly_generation(snakemake.input.generation_hourly)
     inputs = SystemInputs(
         generation=area_generation(n, area_to_bus),
         observed_monthly=monthly,

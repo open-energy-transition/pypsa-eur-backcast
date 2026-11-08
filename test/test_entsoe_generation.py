@@ -11,6 +11,7 @@ from scripts.build_entsoe_generation import (
     hourly_generation,
     monthly_generation,
 )
+from scripts.lib.entsoe import read_hourly_generation
 from scripts.retrieve_actual_generation_entsoe import aggregated_generation
 from test.backcast_calibration_network import SNAPSHOTS, frame
 
@@ -89,3 +90,16 @@ def test_monthly_generation_sums_within_snapshots():
         }
     )
     pd.testing.assert_frame_equal(result, expected, check_index_type=False)
+
+
+def test_read_hourly_generation_round_trips(tmp_path):
+    hourly = pd.DataFrame(
+        {"nuclear": [1.0, np.nan, 3.0, 4.0], "hydro": [5.0, 6.0, np.nan, 8.0]},
+        index=SNAPSHOTS,
+    )
+    generation = hourly_generation({"ES": hourly, "NO_1": hourly}, SNAPSHOTS)
+    path = tmp_path / "entsoe_generation_hourly.csv"
+    generation.to_csv(path)
+    pd.testing.assert_frame_equal(
+        read_hourly_generation(str(path)), generation, check_freq=False
+    )

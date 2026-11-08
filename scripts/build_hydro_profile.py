@@ -57,7 +57,11 @@ from scripts._helpers import (
     load_cutout,
     set_scenario_config,
 )
-from scripts.lib.entsoe import assert_known_areas, read_area_to_bus
+from scripts.lib.entsoe import (
+    assert_known_areas,
+    read_area_to_bus,
+    read_hourly_generation,
+)
 
 cc = coco.CountryConverter()
 
@@ -245,7 +249,7 @@ def entsoe_balance(
     assert_known_areas(
         filling.columns, reporting_areas, "entsoe_balance: filling_first_year"
     )
-    carriers = generation.loc[time].T.groupby(level=[0, 1]).sum(min_count=1).T
+    carriers = generation.loc[time]
     hydro = carriers.xs("hydro", axis=1, level=1).reindex(
         columns=carriers.columns.levels[0]
     )
@@ -401,12 +405,7 @@ if __name__ == "__main__":
         inflow = inflow.where(inflow > params_hydro["clip_min_inflow"], 0)
 
     if params_hydro["inflow_source"] == "entsoe_balance":
-        generation = pd.read_csv(
-            snakemake.input.entsoe_generation,
-            header=[0, 1],
-            index_col=0,
-            parse_dates=True,
-        )
+        generation = read_hourly_generation(snakemake.input.entsoe_generation)
         first_year = params_hydro["entsoe_balance"]["filling_first_year"]
         filling = pd.DataFrame(
             {

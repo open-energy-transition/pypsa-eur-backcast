@@ -846,9 +846,8 @@ def attach_hydro(
     if not inflow_idx.empty:
         dist_key = ppl.loc[inflow_idx, "p_nom"].groupby(country).transform(normed)
 
-        balance = params["inflow_source"] == "entsoe_balance"
-        profile = xr.load_dataset(profile_hydro) if balance else None
-        inflow = profile["inflow"] if balance else xr.load_dataarray(profile_hydro)
+        profile = xr.load_dataset(profile_hydro)
+        inflow = profile["inflow"]
         inflow_countries = pd.Index(country[inflow_idx])
         missing_c = inflow_countries.unique().difference(inflow.indexes["countries"])
         assert missing_c.empty, (
@@ -865,7 +864,7 @@ def attach_hydro(
             .multiply(dist_key, axis=1)
         )
 
-        if balance:
+        if params["inflow_source"] == "entsoe_balance":
             balance_t, e_nom = balance_inflow(ppl.loc[inflow_idx], profile)
             inflow_t[balance_t.columns] = balance_t
 
