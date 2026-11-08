@@ -175,6 +175,8 @@ ALL_YEARS = range(2019, 2026)
     [
         ("FI", "Olkiluoto 1", "Nuclear", ALL_YEARS),
         ("FI", "Alholmens Kraft", "Bioenergy", ALL_YEARS),
+        ("FI", "Kemi Bioproduct Mill", "Bioenergy", range(2023, 2026)),
+        ("FI", "Kymijarvi", "Bioenergy", range(0)),
         ("FI", "Haapavesi", "Lignite", ALL_YEARS),
         ("FI", "Naantali Chp", "Hard Coal", range(2021, 2026)),
         ("FI", "Meri-Pori", "Hard Coal", range(0)),
