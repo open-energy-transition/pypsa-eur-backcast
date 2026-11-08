@@ -66,6 +66,8 @@ backcast-2019: &backcast-2019
     fuel_price:
       biomass: 22.68  # C.A.R.M.E.N. e.V. wood chip price index, forest wood chips (Waldhackschnitzel WG 35) annual mean in EUR/MWh net of VAT, https://www.carmen-ev.de/wp-content/uploads/2025/03/Hackschnitzelpreise-Jahresmittelwerte-MWh-netto.pdf (index page https://www.carmen-ev.de/service/marktueberblick/marktpreise-energieholz/marktpreise-hackschnitzel/); a German delivered wood-chip price applied to all areas; replaces the technology data value of 9.35 EUR/MWh_th
     energy_budget_carriers: [biomass]  # annual ENTSO-E biomass generation as e_sum_max (plan item 1.3)
+    external_flows:
+      areas: [UA, TR, RU, RU_KGD, BY]  # MD dropped: ENTSO-E publishes no RO-MD scheduled exchanges or physical flows in 2019 (logs/retrieve_cross_border_capacities_entsoe_2019_RO-MD.log)
     monthly_availability_exclude:
       biomass: [BE, BG, DK_1, DK_2, EE, FI, HR, HU, IT_CNOR, IT_CSUD, IT_NORD, IT_SARD, IT_SICI, IT_SUD, LT, LV, NL, PL, RS]  # ENTSO-E biomass below half of Eurostat nrg_bal_peh main-activity biomass electricity or load - generation - net scheduled imports above 5 % of load, dev/backcast-accuracy/p1-nuclear-biomass/coverage_2019.csv
 
