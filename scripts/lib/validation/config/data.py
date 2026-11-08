@@ -297,6 +297,10 @@ class DataConfig(BaseModel):
         default_factory=lambda: _DataSourceConfig(source="build"),
         description="ENTSO-E unavailability of generation and production units data source configuration.",
     )
+    entsoe_reservoir_filling: _DataSourceConfig = Field(
+        default_factory=lambda: _DataSourceConfig(source="build"),
+        description="ENTSO-E weekly filling of water reservoirs and hydro storage plants data source configuration.",
+    )
     entsoe_cross_border_capacities: _DataSourceConfig = Field(
         default_factory=lambda: _DataSourceConfig(source="build"),
         description="ENTSO-E day-ahead cross-border capacities data source configuration.",

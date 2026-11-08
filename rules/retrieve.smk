@@ -647,6 +647,26 @@ if (ENTSOE_GENERATION_DATA := dataset_version("entsoe_actual_generation"))[
             scripts("retrieve_actual_generation_entsoe.py")
 
 
+if (ENTSOE_FILLING_DATA := dataset_version("entsoe_reservoir_filling"))["source"] in [
+    "build"
+]:
+
+    rule retrieve_reservoir_filling_entsoe:
+        """Downloads the weekly filling of water reservoirs and hydro storage plants for one area and year from ENTSO-E."""
+        output:
+            csv=f"{ENTSOE_FILLING_DATA['folder']}"
+            + "/reservoir_filling_{area}_{year}.csv",
+        log:
+            "logs/retrieve_reservoir_filling_entsoe_{area}_{year}.log",
+        wildcard_constraints:
+            year=r"\d{4}",
+        retries: 2
+        resources:
+            mem_mb=1000,
+        script:
+            scripts("retrieve_reservoir_filling_entsoe.py")
+
+
 if (ENTSOE_UNAVAILABILITY_DATA := dataset_version("entsoe_unavailability"))[
     "source"
 ] in ["build"]:
@@ -685,6 +705,8 @@ if (ENTSOE_CAPACITIES_DATA := dataset_version("entsoe_cross_border_capacities"))
         retries: 5
         resources:
             mem_mb=2000,
+        params:
+            external_areas=config_provider("backcast", "external_flows", "areas"),
         script:
             scripts("retrieve_cross_border_capacities_entsoe.py")
 

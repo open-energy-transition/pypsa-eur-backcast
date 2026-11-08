@@ -260,6 +260,41 @@ class _SolarConfig(BaseModel):
     )
 
 
+FILLING_AREAS = [
+    "NO_1",
+    "NO_2",
+    "NO_3",
+    "NO_4",
+    "NO_5",
+    "SE_1",
+    "SE_2",
+    "SE_3",
+    "SE_4",
+    "FI",
+    "ES",
+    "PT",
+    "AT",
+    "IT",
+    "FR",
+    "BG",
+    "RO",
+    "HR",
+]
+
+
+class _HydroEntsoeBalanceConfig(BaseModel):
+    """Configuration for the hydro inflow from the ENTSO-E water balance."""
+
+    filling_first_year: dict[str, int] = Field(
+        default_factory=lambda: {area: 2015 for area in FILLING_AREAS} | {"RS": 2017},
+        description="ENTSO-E areas that publish the weekly filling of water reservoirs and hydro storage plants (Transparency Platform 16.1.D) with the first year whose filling is retrieved. CH publishes filling too but is in `exclude_areas`. The maximum filling from this year to the last snapshot year is the reservoir energy capacity. Defaults: first published week 2014-12-28 to 2015-02-22 for all areas except RS, which publishes from 2016-12-11 (weekly filling retrieved for 2015 to 2024 in dev/day-ahead-backcast/phase3/data/reservoir_filling_2015_2024_weekly_MWh.csv).",
+    )
+    exclude_areas: list[str] = Field(
+        default_factory=lambda: ["CH", "XK"],
+        description="ENTSO-E areas that keep the EIA based inflow because their published actual generation misses most of the hydro fleet: CH 13.1 TWh hydro and run-of-river in 2023 on the Transparency Platform against 37.0 TWh in `data/eia_hydro_annual_generation.csv`, XK 0.01 against 0.39 TWh.",
+    )
+
+
 class _HydroConfig(BaseModel):
     """Configuration for hydropower."""
 
@@ -305,6 +340,14 @@ class _HydroConfig(BaseModel):
     eia_approximate_missing: bool = Field(
         False,
         description="Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
+    )
+    inflow_source: Literal["eia", "entsoe_balance"] = Field(
+        "eia",
+        description="Source of the run-of-river and reservoir inflow. 'eia' scales the runoff per country to the annual EIA hydro generation and splits it onto the plants by `p_nom`. 'entsoe_balance' takes the inflow per ENTSO-E bidding zone area in `backcast: area_to_bus` from the hourly actual generation of run-of-river and reservoir hydro plus the weekly change of the reservoir filling, sets the reservoir energy capacity to the maximum observed filling and the reservoir dispatch efficiency to 1. Areas without published generation keep the EIA based inflow.",
+    )
+    entsoe_balance: _HydroEntsoeBalanceConfig = Field(
+        default_factory=_HydroEntsoeBalanceConfig,
+        description="Configuration for `inflow_source: entsoe_balance`.",
     )
 
 
