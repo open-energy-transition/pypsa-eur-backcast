@@ -113,6 +113,29 @@ def test_external_borders_known(scenario):
     assert not external & modelled
 
 
+@pytest.mark.parametrize(
+    "path, off",
+    [
+        ("renewable.hydro.flatten_dispatch", False),
+        ("renewable.hydro.inflow_source", "eia"),
+        ("backcast.calibrate_wind", False),
+        ("backcast.calibrate_solar", False),
+        ("backcast.monthly_nuclear_availability", False),
+        ("backcast.nuclear_min_output", False),
+        ("backcast.energy_budget_carriers", []),
+        ("backcast.chp_floor.enable", False),
+        ("backcast.hybrid_capacities.enable", False),
+        ("backcast.external_flows.enable", False),
+        ("backcast.fuel_price", {"nuclear": 7.4536, "biomass": 9.3506}),
+    ],
+)
+def test_plain_scenario_unrefined(path, off):
+    config = resolve("backcast-2019-plain")
+    for key in path.split("."):
+        config = config[key]
+    assert config == off
+
+
 ENTSOE_INSTALLED = pd.read_csv(ROOT / "test/test_data/backcast_installed_capacity.csv")
 
 

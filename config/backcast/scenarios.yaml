@@ -69,11 +69,12 @@ backcast-2019: &backcast-2019
     monthly_availability_exclude:
       biomass: [BE, BG, DK_1, DK_2, EE, FI, HR, HU, IT_CNOR, IT_CSUD, IT_NORD, IT_SARD, IT_SICI, IT_SUD, LT, LV, NL, PL, RS]  # ENTSO-E biomass below half of Eurostat nrg_bal_peh main-activity biomass electricity or load - generation - net scheduled imports above 5 % of load, dev/backcast-accuracy/p1-nuclear-biomass/coverage_2019.csv
 
-backcast-2019-plain:  # unrefined 2019 reference: 2019 without the hydro, must-run, CHP floor, cost spread, wind, solar, nuclear, hybrid capacity and external flow refinements
+backcast-2019-plain:  # unrefined 2019 reference: 2019 without flattened hydro dispatch, ENTSO-E hydro inflow (EIA inflow instead), must-run minima, CHP floor, cost spread, custom backcast costs, wind and solar calibration, monthly nuclear availability, nuclear minimum output, biomass energy budget, fuel price overrides, hybrid capacities and external flows; keeps the fleet corrections of the powerplant filters
   <<: *backcast-2019
   renewable:
     hydro:
       flatten_dispatch: false
+      inflow_source: eia
   conventional:
     <<: *backcast-2019-conventional
     nuclear:
@@ -101,6 +102,9 @@ backcast-2019-plain:  # unrefined 2019 reference: 2019 without the hydro, must-r
       enable: false
     external_flows:
       enable: false
+    fuel_price:  # technology data v0.15.0 costs_2020 values, as an empty mapping does not clear the inherited nuclear and biomass prices under the recursive scenario merge
+      nuclear: 7.4536
+      biomass: 9.3506
 
 backcast-2020:
   snapshots:

@@ -77,15 +77,24 @@ def test_nuclear_min_output(network, generation, area_map, be, nl):
     np.testing.assert_allclose(p_min_pu["FR nuclear"], [0.1, 0.1, 0.2, 0.2])
 
 
-def test_nuclear_min_output_survives_export(network, generation, tmp_path):
-    generation[("BE", "nuclear")] = 45.0
+@pytest.mark.parametrize(
+    "observed, expected",
+    [
+        ([45.0] * 4, [0.45] * 4),
+        ([80.0, 60.0, 95.0, 95.0], [0.6, 0.6, 0.9, 0.9]),
+    ],
+)
+def test_nuclear_min_output_survives_export(
+    network, generation, tmp_path, observed, expected
+):
+    generation[("BE", "nuclear")] = observed
     apply_nuclear_min_output(network, generation, AREA_TO_BUS, {}, {})
     clip_p_min_pu(network)
     network.export_to_netcdf(tmp_path / "network.nc")
 
     n = pypsa.Network(tmp_path / "network.nc")
     p_min_pu = n.get_switchable_as_dense("Generator", "p_min_pu")
-    np.testing.assert_allclose(p_min_pu["BE nuclear"], 0.45)
+    np.testing.assert_allclose(p_min_pu["BE nuclear"], expected)
     assert (p_min_pu <= n.get_switchable_as_dense("Generator", "p_max_pu")).all().all()
 
 
