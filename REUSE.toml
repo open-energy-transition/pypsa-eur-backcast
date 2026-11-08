@@ -60,6 +60,9 @@ SPDX-License-Identifier = "CC-BY-4.0"
 [[annotations]]
 path = [
     "data/custom_powerplants.csv",
+    "data/backcast_lignite_p_min_pu.csv",
+    "data/solar_self_consumption.csv",
+    "data/entsoe_external_borders.csv",
 ]
 SPDX-FileCopyrightText = "The PyPSA-Eur Authors"
 SPDX-License-Identifier = "CC0-1.0"
