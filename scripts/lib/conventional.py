@@ -23,7 +23,7 @@ def clip_p_min_pu(n: pypsa.Network) -> None:
     gens = g.index[g.p_min_pu > 0].union(n.generators_t.p_min_pu.columns)
     p_min_pu = n.get_switchable_as_dense("Generator", "p_min_pu", inds=gens)
     p_max_pu = n.get_switchable_as_dense("Generator", "p_max_pu", inds=gens)
-    clipped = gens[(p_min_pu > p_max_pu).any()]
+    clipped = p_min_pu.columns[(p_min_pu > p_max_pu[p_min_pu.columns]).any()]
     if clipped.empty:
         return
     set_switchable(n, "p_min_pu", p_min_pu[clipped].clip(upper=p_max_pu[clipped]))

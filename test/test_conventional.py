@@ -281,7 +281,10 @@ def test_conventional_config_rejects_invalid_gas_price_cap(config):
     [
         {"country_fuel_price": {"coal": {"PL": {"2022": 15.0}}}},
         {"country_fuel_price": {"coal": {"PL": {"2022-01-01": -1.0}}}},
-        {"dynamic_fuel_price": True, "country_fuel_price": {"coal": {"PL": {"2022-01-01": 15.0}}}},
+        {
+            "dynamic_fuel_price": True,
+            "country_fuel_price": {"coal": {"PL": {"2022-01-01": 15.0}}},
+        },
     ],
     ids=["invalid-date", "negative", "real-fuel-price"],
 )
@@ -372,3 +375,19 @@ def test_conventional_config_accepts_daily_gas_price():
         dynamic_fuel_price=True, fuel_price_nominal=True, daily_gas_price=daily
     )
     assert config.daily_gas_price.default_hub is None
+
+
+def test_clip_p_min_pu_matches_generator_names():
+    n = pypsa.Network()
+    n.set_snapshots(SNAPSHOTS)
+    n.add("Bus", "DE00")
+    n.add("Generator", "waste", bus="DE00", p_nom=10.0, p_min_pu=0.3, p_max_pu=0.2)
+    n.add("Generator", "coal", bus="DE00", p_nom=10.0, p_min_pu=0.3)
+    n.add("Generator", "oil", bus="DE00", p_nom=10.0)
+    n.generators_t.p_min_pu["oil"] = [0.2, 0.1, 0.1]
+    clip_p_min_pu(n)
+
+    p_min_pu = n.get_switchable_as_dense("Generator", "p_min_pu")
+    np.testing.assert_allclose(p_min_pu.waste, 0.2)
+    np.testing.assert_allclose(p_min_pu.coal, 0.3)
+    np.testing.assert_allclose(p_min_pu.oil, [0.2, 0.1, 0.1])
