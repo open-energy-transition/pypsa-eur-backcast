@@ -73,13 +73,14 @@ def scale_availability(
     factor_bounds: list[float],
     kind: str,
     label: str,
+    detail: str = "",
 ) -> None:
     """
     Scale the time-varying ``p_max_pu`` of `gens` so that their available energy over `mask` matches `target`.
 
     One factor applies to all `gens` and snapshots, ``p_max_pu`` is clipped
-    at 1. A factor outside `factor_bounds` raises an error naming `label`
-    and the ``backcast`` keys of `kind` to change.
+    at 1. A factor outside `factor_bounds` raises an error naming `label`,
+    the ``backcast`` keys of `kind` to change and `detail`.
     """
     before = available_energy(n, gens, mask)
     assert before > 0, (
@@ -91,6 +92,7 @@ def scale_availability(
         f"{kind.capitalize()} calibration factor {factor:.2f} of {label} is outside "
         f"the bounds [{lower}, {upper}]. Add {label} to backcast: "
         f"{kind}_calibration_exclude or widen backcast: {kind}_calibration_factor_bounds."
+        f"{detail}"
     )
     p_max_pu = n.generators_t.p_max_pu
     p_max_pu[gens] = (p_max_pu[gens] * factor).clip(upper=1)
@@ -256,7 +258,9 @@ def calibrate_solar(
     `self_consumption` is removed from their availability, so that their
     solar is grid-fed as well. Countries without a share keep their
     availability. The `unpublished_twh` of a calibrated area is added to
-    its target. Factors outside `factor_bounds` raise an error.
+    its target, scaled to the share of the available energy of the area in
+    the months with actual solar generation. Factors outside `factor_bounds`
+    raise an error.
 
     Parameters
     ----------
@@ -291,6 +295,8 @@ def calibrate_solar(
     energy = area_energy(n, generation, ["solar"])
     calibrated = energy.index.unique("area")
     months = snapshot_months(n)
+    full_year = np.ones(len(months), dtype=bool)
+    year = n.snapshots[0].year
     targets = set(calibrated) & set(areas) - set(exclude)
     uncalibrated = sorted(set(unpublished_twh.index) - targets)
     assert not uncalibrated, f"Unpublished solar for uncalibrated areas: {uncalibrated}"
@@ -300,8 +306,19 @@ def calibrate_solar(
         elif area in calibrated:
             actual = energy[area]["solar"]
             mask = months.isin(actual.index)
-            target = actual.sum() + unpublished_twh.get(area, 0.0) * 1e6
-            scale_availability(n, gens, mask, target, factor_bounds, "solar", area)
+            window = available_energy(n, gens, mask) / available_energy(
+                n, gens, full_year
+            )
+            full = unpublished_twh.get(area, 0.0)
+            unpublished = full * 1e6 * window
+            detail = (
+                f" Year {year}, unpublished solar applied {unpublished / 1e6:.4g} TWh "
+                f"of {full:.4g} TWh ({window:.1%} of the available energy)."
+            )
+            target = actual.sum() + unpublished
+            scale_availability(
+                n, gens, mask, target, factor_bounds, "solar", area, detail
+            )
         else:
             n.generators_t.p_max_pu[gens] = 0.0
             logger.warning(

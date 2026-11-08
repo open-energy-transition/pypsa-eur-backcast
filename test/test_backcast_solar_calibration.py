@@ -106,6 +106,30 @@ def test_calibrate_solar_raises(network, exclude, shares, unpublished, match):
         )
 
 
+@pytest.mark.parametrize(
+    "observed, february, match",
+    [
+        (ES_SOLAR, 0.5, r"3.20 of ES .* 2023, .* 0.0012 TWh of 0.0012 TWh \(100.0%"),
+        (ES_SOLAR_JAN, 0.5, r"3.10 of ES .* 2023, .* 0.0006 TWh of 0.0012 TWh \(50.0%"),
+        (
+            ES_SOLAR_JAN,
+            0.25,
+            r"4.10 of ES .* 2023, .* 0.0008 TWh of 0.0012 TWh \(66.7%",
+        ),
+    ],
+    ids=["full-window", "half-window", "energy-weighted-window"],
+)
+def test_calibrate_solar_raises_with_applied_unpublished(
+    network, observed, february, match
+):
+    network.generators_t.p_max_pu.loc["2023-02", ES] = february
+    unpublished = pd.Series({"ES": 1200e-6})
+    with pytest.raises(AssertionError, match=match):
+        calibrate_solar(
+            network, frame(observed), AREA_TO_BUS, [], BOUNDS, NO_SHARE, unpublished
+        )
+
+
 def test_calibrate_solar_requires_time_varying_availability(network):
     network.add("Generator", "ES00 solar static", bus="ES00", carrier="solar")
     with pytest.raises(AssertionError, match=r"without time-varying p_max_pu: \['ES00"):
