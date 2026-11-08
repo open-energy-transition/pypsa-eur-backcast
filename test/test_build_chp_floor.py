@@ -14,7 +14,7 @@ from scripts.build_chp_floor import (
     heat_profile,
     read_chp_production,
 )
-from scripts.lib.conventional import apply_chp_floor
+from scripts.lib.conventional import apply_chp_floor, clip_p_min_pu
 
 SNAPSHOTS = pd.date_range("2023-01-01", periods=72, freq="h")
 TSV = """freq,nrg_bal,siec,unit,geo\\TIME_PERIOD\t2022 \t2023
@@ -50,6 +50,26 @@ def test_read_chp_production_missing_year(tmp_path):
 
     with pytest.raises(AssertionError, match="no data for 2025"):
         read_chp_production(str(path), 2025, ["gas"])
+
+
+@pytest.mark.parametrize(
+    ("siec", "expected"),
+    [("O4680", 3e3), ("O4671XR5220B", 3e3), ("O4610", None), ("O4699", None)],
+    ids=["fuel-oil", "gas-oil", "refinery-gas", "other-oil-products"],
+)
+def test_read_chp_production_oil(tmp_path, siec, expected):
+    path = tmp_path / "nrg_bal_peh.tsv"
+    path.write_text(
+        "freq,nrg_bal,siec,unit,geo\\TIME_PERIOD\t2023\n"
+        f"A,GEP_MAPCHP,{siec},GWH,IT\t3\n"
+        f"A,GHP_MAPCHP,{siec},GWH,IT\t5\n"
+        "A,GEP_MAPCHP,O4000XBIO,GWH,IT\t3\n"
+        "A,GEP_MAPCHP,G3000,GWH,IT\t1\n"
+    )
+
+    production = read_chp_production(str(path), 2023, ["gas", "oil"])
+
+    assert production["electricity"].get(("IT", "oil")) == expected
 
 
 @pytest.mark.parametrize(("year", "expected"), [(None, 2023), (2022, 2022)])
@@ -123,3 +143,55 @@ def test_apply_chp_floor(replace, expected_biomass):
     np.testing.assert_allclose(p_min_pu["DE OCGT"], [0.5, 0.1])
     np.testing.assert_allclose(p_min_pu["DE biomass"], expected_biomass)
     np.testing.assert_allclose(p_min_pu["GB biomass"], 0.3)
+
+
+@pytest.fixture
+def chp_network() -> pypsa.Network:
+    n = pypsa.Network()
+    n.set_snapshots(SNAPSHOTS[:2])
+    n.add("Bus", "IT00", country="IT")
+    n.add(
+        "Generator",
+        ["IT CCGT", "IT oil"],
+        bus="IT00",
+        carrier=["CCGT", "oil"],
+        p_nom=[100.0, 100.0],
+        p_max_pu=pd.DataFrame(
+            {"IT CCGT": [1.0, 1.0], "IT oil": [0.8, 0.5]}, index=SNAPSHOTS[:2]
+        ),
+    )
+    return n
+
+
+@pytest.mark.parametrize(
+    ("oil_floor", "expected"),
+    [([50.0, 40.0], [0.5, 0.4]), ([120.0, 60.0], [0.8, 0.5])],
+    ids=["below-p_max_pu", "above-p_max_pu"],
+)
+def test_apply_chp_floor_then_clip(chp_network, oil_floor, expected):
+    floor = pd.DataFrame({("IT", "oil"): oil_floor}, index=SNAPSHOTS[:2])
+
+    apply_chp_floor(chp_network, floor, [])
+    clip_p_min_pu(chp_network)
+
+    p_min_pu = chp_network.get_switchable_as_dense("Generator", "p_min_pu")
+    p_max_pu = chp_network.get_switchable_as_dense("Generator", "p_max_pu")
+    np.testing.assert_allclose(p_min_pu["IT oil"], expected)
+    np.testing.assert_allclose(p_min_pu["IT CCGT"], 0.0)
+    assert (p_min_pu <= p_max_pu).all().all()
+
+
+@pytest.mark.parametrize(
+    ("coal_floor", "warned"), [(0.0, False), (10.0, True)], ids=["empty", "positive"]
+)
+def test_apply_chp_floor_unmatched(chp_network, caplog, coal_floor, warned):
+    floor = pd.DataFrame(
+        {("IT", "gas"): [10.0, 10.0], ("IT", "coal"): coal_floor}, index=SNAPSHOTS[:2]
+    )
+
+    apply_chp_floor(chp_network, floor, [])
+
+    assert ("CHP floor without generators" in caplog.text) == warned
+    np.testing.assert_allclose(
+        chp_network.get_switchable_as_dense("Generator", "p_min_pu")["IT CCGT"], 0.1
+    )

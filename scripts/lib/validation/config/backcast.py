@@ -101,7 +101,7 @@ class ChpFloorConfig(ConfigModel):
     )
     fuels: list[ChpFuel] = Field(
         default_factory=lambda: ["gas", "coal", "lignite", "oil", "biomass", "waste"],
-        description="Fuel groups that receive the floor: gas (CCGT, OCGT), coal, lignite, oil, biomass and waste.",
+        description="Fuel groups that receive the floor: gas (CCGT, OCGT), coal, lignite, oil, biomass and waste. Oil counts marketed oil products but not refinery gas and other oil products, which fire refinery-sited plants raising process steam that does not follow heating degree days.",
     )
     replace_p_min_pu: list[ChpFuel] = Field(
         default_factory=lambda: ["biomass", "waste"],

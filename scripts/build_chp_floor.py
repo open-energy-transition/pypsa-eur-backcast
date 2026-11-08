@@ -8,7 +8,11 @@ The annual floor energy of a country and fuel group is the minimum of the
 back-pressure ratio ``c_b`` of the matching CHP technology in the cost data times
 the main-activity CHP heat output and the main-activity CHP electricity output in
 Eurostat ``nrg_bal_peh`` for the snapshot year or ``year``. Autoproducer CHP serves on-site
-demand and is not counted. ``c_b`` times the heat is the least electricity a
+demand and is not counted. Oil counts the marketed fuels (fuel oil, gas oil, LPG,
+naphtha, kerosene and gasoline) but not refinery gas and other oil products: these
+refinery by-products fire refinery-sited plants that raise process steam, which
+does not follow heating degree days. Excluding them lowers the oil floor in every
+year where Eurostat reports them as main-activity CHP. ``c_b`` times the heat is the least electricity a
 back-pressure or extraction unit generates for that heat. The floor follows a
 daily heat demand profile: heating degree days below ``heat_threshold`` from the
 cutout temperature, weighted by the urban population of each country, plus a flat
@@ -33,7 +37,17 @@ FUEL_SIEC = {
     "gas": ["G3000"],
     "coal": ["C0110", "C0121", "C0129", "C0210"],
     "lignite": ["C0220"],
-    "oil": ["O4000XBIO"],
+    "oil": [
+        "O4630",
+        "O4640",
+        "O4651",
+        "O4652XR5210B",
+        "O4653",
+        "O4661XR5230B",
+        "O4669",
+        "O4671XR5220B",
+        "O4680",
+    ],
     "biomass": ["R5110-5150_W6000RI", "R5300", "R5210B", "R5220B", "R5230B", "R5290"],
     "waste": ["W6100_6220", "W6210"],
 }

@@ -55,6 +55,14 @@ def apply_chp_floor(
     keys = groups[g.index.get_indexer(covered)]
     floor = floor.reindex(n.snapshots)
     assert floor.notna().all().all(), "CHP floor does not cover the snapshots."
+    unmatched = floor.loc[:, ~floor.columns.isin(groups)]
+    unmatched = unmatched.mul(n.snapshot_weightings.generators, axis=0).sum()
+    unmatched = unmatched[unmatched > 0]
+    if not unmatched.empty:
+        logger.warning(
+            "CHP floor without generators, dropped in TWh: "
+            + ", ".join(f"{c} {f} {e / 1e6:.3f}" for (c, f), e in unmatched.items())
+        )
     p_nom = g.p_nom[covered].groupby(keys).sum()
     share = floor[keys].div(p_nom[keys].to_numpy()).set_axis(covered, axis=1)
     replaced = covered[keys.get_level_values(1).isin(replace_p_min_pu)]
