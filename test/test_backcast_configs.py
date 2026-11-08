@@ -174,6 +174,23 @@ def test_custom_powerplants_match_entsoe(scenario):
         assert fleet[key] == pytest.approx(row.capacity_mw, abs=150), key
 
 
+BIOMASS_TOPUP = pd.read_csv(ROOT / "test/test_data/backcast_biomass_topup.csv")
+
+
+def test_biomass_topup_reaches_entsoe(scenario):
+    _, year, config = scenario
+    custom = pd.read_csv(ROOT / "data/custom_powerplants.csv").query(
+        config["electricity"]["custom_powerplants"]
+    )
+    topup = custom.query("Name == 'Biomass units not in powerplantmatching'")
+    assert (topup.Fueltype == "Bioenergy").all()
+    added = topup.groupby("Country").Capacity.sum()
+    expected = BIOMASS_TOPUP.query("year == @year").set_index("country")
+    gap = expected.target_mw - expected.powerplantmatching_mw
+    assert added.index.sort_values().equals(gap.index.sort_values())
+    assert added[gap.index].sub(gap).between(0, 0.2).all()
+
+
 def test_lignite_p_min_pu_covers_countries(scenario):
     _, year, config = scenario
     p_min_pu = config["conventional"]["lignite"]["p_min_pu"]

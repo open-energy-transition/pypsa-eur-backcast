@@ -16,9 +16,9 @@ backcast-2019: &backcast-2019
     default_cutout: europe-2019-sarah3-era5
 
   electricity:
-    # FI peat and nuclear (including the peat CHPs that powerplantmatching labels Solid Biomass), BA Capljina and lignite, EE Iru rows are replaced by data/custom_powerplants.csv (ENTSO-E 14.1.B); the other FI biomass stays from powerplantmatching, as the ENTSO-E 16.1.A FI biomass total (1.83 GW) is far below it. FI: Kemi Bioproduct Mill is replaced by Metsa Fibre Kemi from 2023. EE: Kiisa is an Elering emergency reserve that does not bid into the day-ahead market, so powerplantmatching Kiisa Erpp is dropped in every year without replacement. FI: Naantali switched from hard coal (14.1.B B05 471 MW in 2019-2020) to biomass (B01 201 MW), so powerplantmatching Naantali Chp is dropped from 2021 (16.1.A FI hard coal 2163 MW in 2020, 1682 MW in 2021). SE: Stenungsund is out of operation since 2017 (https://group.vattenfall.com/press-and-media/newsroom/2017/the-hidden-power-plant/) and the Oresundsverket site (Nya Oresundsverket and the old Oresundsverket oil unit) was mothballed from 2017 until 2025 (https://www.uniper.energy/sverige/nyheter/oeresundsverket-tillbaka-i-drift-efter-atta-ar/), neither counts in the Swedish fossil capacity of Energiforetagen, Energiaret tabell 2 (https://www.energiforetagen.se/496178/globalassets/energiforetagen/statistik/energiaret/2023/energiaret-2023_tabeller.pdf).
+    # FI peat and nuclear (including the peat CHPs that powerplantmatching labels Solid Biomass), BA Capljina and lignite, EE Iru rows are replaced by data/custom_powerplants.csv (ENTSO-E 14.1.B); the other FI biomass stays from powerplantmatching, as the ENTSO-E 16.1.A FI biomass total (1.83 GW) is far below it. FI: Kemi Bioproduct Mill is replaced by Metsa Fibre Kemi from 2023. EE: Kiisa is an Elering emergency reserve that does not bid into the day-ahead market, so powerplantmatching Kiisa Erpp is dropped in every year without replacement. FI: Naantali switched from hard coal (14.1.B B05 471 MW in 2019-2020) to biomass (B01 201 MW), so powerplantmatching Naantali Chp is dropped from 2021 (16.1.A FI hard coal 2163 MW in 2020, 1682 MW in 2021). SE: Stenungsund is out of operation since 2017 (https://group.vattenfall.com/press-and-media/newsroom/2017/the-hidden-power-plant/) and the Oresundsverket site (Nya Oresundsverket and the old Oresundsverket oil unit) was mothballed from 2017 until 2025 (https://www.uniper.energy/sverige/nyheter/oeresundsverket-tillbaka-i-drift-efter-atta-ar/), neither counts in the Swedish fossil capacity of Energiforetagen, Energiaret tabell 2 (https://www.energiforetagen.se/496178/globalassets/energiforetagen/statistik/energiaret/2023/energiaret-2023_tabeller.pdf). AT, BE, CZ, DK, ES, FR, HU, LV, PT, RO, RS biomass is topped up in the years where the fixed biomass profile (energy_budget_fixed) exceeds the powerplantmatching fleet (2019, 2020, 2023, 2024) by the custom rows 'Biomass units not in powerplantmatching' to ENTSO-E 16.1.A installed capacity, or the observed hourly peak where higher.
     powerplants_filter: "(DateOut >= 2019 or DateOut != DateOut) and (DateIn <= 2019 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen']) and not (Country == 'FI' and (Fueltype in ['Lignite', 'Nuclear'] or Name in ['Toppila Ja', 'Seinajoki', 'Haapaniemen', 'Keljonlahti', 'Alholmens Kraft'])) and not (Country == 'BA' and Name in ['Capljina', 'Gacko', 'Kakanj', 'Tuzla', 'Ugljevik']) and not (Country == 'EE' and Name in ['Kiisa Erpp', 'Iru Elektrijaam']) and not (Country == 'SE' and Name in ['Stenungsund', 'Nya Oresundsverket', 'Oresundsverket'])"
-    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA'] and (DateOut >= 2019 or DateOut != DateOut) and (DateIn <= 2019 or DateIn != DateIn)"
+    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA', 'AT', 'BE', 'CZ', 'DK', 'ES', 'FR', 'HU', 'LV', 'PT', 'RO', 'RS'] and (DateOut >= 2019 or DateOut != DateOut) and (DateIn <= 2019 or DateIn != DateIn)"
     estimate_renewable_capacities:
       year: 2019
 
@@ -121,7 +121,7 @@ backcast-2020:
 
   electricity:
     powerplants_filter: "(DateOut >= 2020 or DateOut != DateOut) and (DateIn <= 2020 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen']) and not (Country == 'FI' and (Fueltype in ['Lignite', 'Nuclear'] or Name in ['Toppila Ja', 'Seinajoki', 'Haapaniemen', 'Keljonlahti', 'Alholmens Kraft'])) and not (Country == 'BA' and Name in ['Capljina', 'Gacko', 'Kakanj', 'Tuzla', 'Ugljevik']) and not (Country == 'EE' and Name in ['Kiisa Erpp', 'Iru Elektrijaam']) and not (Country == 'SE' and Name in ['Stenungsund', 'Nya Oresundsverket', 'Oresundsverket'])"
-    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA'] and (DateOut >= 2020 or DateOut != DateOut) and (DateIn <= 2020 or DateIn != DateIn)"
+    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA', 'AT', 'BE', 'CZ', 'DK', 'ES', 'FR', 'HU', 'LV', 'PT', 'RO', 'RS'] and (DateOut >= 2020 or DateOut != DateOut) and (DateIn <= 2020 or DateIn != DateIn)"
     estimate_renewable_capacities:
       year: 2020
 
@@ -176,7 +176,7 @@ backcast-2021:
 
   electricity:
     powerplants_filter: "(DateOut >= 2021 or DateOut != DateOut) and (DateIn <= 2021 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen']) and not (Country == 'FI' and (Fueltype in ['Lignite', 'Nuclear'] or Name in ['Toppila Ja', 'Seinajoki', 'Haapaniemen', 'Keljonlahti', 'Alholmens Kraft', 'Naantali Chp'])) and not (Country == 'BA' and Name in ['Capljina', 'Gacko', 'Kakanj', 'Tuzla', 'Ugljevik']) and not (Country == 'EE' and Name in ['Kiisa Erpp', 'Iru Elektrijaam']) and not (Country == 'SE' and Name in ['Stenungsund', 'Nya Oresundsverket', 'Oresundsverket'])"
-    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA'] and (DateOut >= 2021 or DateOut != DateOut) and (DateIn <= 2021 or DateIn != DateIn)"
+    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA', 'AT', 'BE', 'CZ', 'DK', 'ES', 'FR', 'HU', 'LV', 'PT', 'RO', 'RS'] and (DateOut >= 2021 or DateOut != DateOut) and (DateIn <= 2021 or DateIn != DateIn)"
     estimate_renewable_capacities:
       year: 2021
 
@@ -236,7 +236,7 @@ backcast-2022:
 
   electricity:
     powerplants_filter: "(DateOut >= 2022 or DateOut != DateOut) and (DateIn <= 2022 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen']) and not (Country == 'FI' and (Fueltype in ['Lignite', 'Nuclear'] or Name in ['Toppila Ja', 'Seinajoki', 'Haapaniemen', 'Keljonlahti', 'Alholmens Kraft', 'Naantali Chp'])) and not (Country == 'BA' and Name in ['Capljina', 'Gacko', 'Kakanj', 'Tuzla', 'Ugljevik']) and not (Country == 'EE' and Name in ['Kiisa Erpp', 'Iru Elektrijaam']) and not (Country == 'SE' and Name in ['Stenungsund', 'Nya Oresundsverket', 'Oresundsverket'])"
-    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA'] and (DateOut >= 2022 or DateOut != DateOut) and (DateIn <= 2022 or DateIn != DateIn)"
+    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA', 'AT', 'BE', 'CZ', 'DK', 'ES', 'FR', 'HU', 'LV', 'PT', 'RO', 'RS'] and (DateOut >= 2022 or DateOut != DateOut) and (DateIn <= 2022 or DateIn != DateIn)"
     estimate_renewable_capacities:
       year: 2022
 
@@ -298,7 +298,7 @@ backcast-2023:
 
   electricity:
     powerplants_filter: "(DateOut >= 2023 or DateOut != DateOut) and (DateIn <= 2023 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen']) and not (Country == 'FI' and (Fueltype in ['Lignite', 'Nuclear'] or Name in ['Toppila Ja', 'Seinajoki', 'Haapaniemen', 'Keljonlahti', 'Alholmens Kraft', 'Kemi Bioproduct Mill', 'Naantali Chp'])) and not (Country == 'BA' and Name in ['Capljina', 'Gacko', 'Kakanj', 'Tuzla', 'Ugljevik']) and not (Country == 'EE' and Name in ['Kiisa Erpp', 'Iru Elektrijaam']) and not (Country == 'SE' and Name in ['Stenungsund', 'Nya Oresundsverket', 'Oresundsverket'])"
-    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA'] and (DateOut >= 2023 or DateOut != DateOut) and (DateIn <= 2023 or DateIn != DateIn)"
+    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA', 'AT', 'BE', 'CZ', 'DK', 'ES', 'FR', 'HU', 'LV', 'PT', 'RO', 'RS'] and (DateOut >= 2023 or DateOut != DateOut) and (DateIn <= 2023 or DateIn != DateIn)"
     estimate_renewable_capacities:
       year: 2023
 
@@ -360,7 +360,7 @@ backcast-2024:
 
   electricity:
     powerplants_filter: "(DateOut >= 2024 or DateOut != DateOut) and (DateIn <= 2024 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen']) and not (Country == 'FI' and (Fueltype in ['Lignite', 'Nuclear'] or Name in ['Toppila Ja', 'Seinajoki', 'Haapaniemen', 'Keljonlahti', 'Alholmens Kraft', 'Kemi Bioproduct Mill', 'Naantali Chp'])) and not (Country == 'BA' and Name in ['Capljina', 'Gacko', 'Kakanj', 'Tuzla', 'Ugljevik']) and not (Country == 'EE' and Name in ['Kiisa Erpp', 'Iru Elektrijaam']) and not (Country == 'SE' and Name in ['Stenungsund', 'Nya Oresundsverket', 'Oresundsverket'])"
-    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA'] and (DateOut >= 2024 or DateOut != DateOut) and (DateIn <= 2024 or DateIn != DateIn)"
+    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA', 'AT', 'BE', 'CZ', 'DK', 'ES', 'FR', 'HU', 'LV', 'PT', 'RO', 'RS'] and (DateOut >= 2024 or DateOut != DateOut) and (DateIn <= 2024 or DateIn != DateIn)"
     estimate_renewable_capacities:
       year: 2024
 
@@ -402,7 +402,7 @@ backcast-2025:
 
   electricity:
     powerplants_filter: "(DateOut >= 2025 or DateOut != DateOut) and (DateIn <= 2025 or DateIn != DateIn) and not (Country == 'NL' and Name in ['Magnum Eemshaven', 'Claus', 'Eem', 'Velsen']) and not (Country == 'FI' and (Fueltype in ['Lignite', 'Nuclear'] or Name in ['Toppila Ja', 'Seinajoki', 'Haapaniemen', 'Keljonlahti', 'Alholmens Kraft', 'Kemi Bioproduct Mill', 'Naantali Chp'])) and not (Country == 'BA' and Name in ['Capljina', 'Gacko', 'Kakanj', 'Tuzla', 'Ugljevik']) and not (Country == 'EE' and Name in ['Kiisa Erpp', 'Iru Elektrijaam']) and not (Country == 'SE' and Name in ['Stenungsund'])"
-    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA'] and (DateOut >= 2025 or DateOut != DateOut) and (DateIn <= 2025 or DateIn != DateIn)"
+    custom_powerplants: "Country in ['NL', 'EE', 'FI', 'BA', 'AT', 'BE', 'CZ', 'DK', 'ES', 'FR', 'HU', 'LV', 'PT', 'RO', 'RS'] and (DateOut >= 2025 or DateOut != DateOut) and (DateIn <= 2025 or DateIn != DateIn)"
     estimate_renewable_capacities:
       year: 2025
       irenastat_source: retrieve
