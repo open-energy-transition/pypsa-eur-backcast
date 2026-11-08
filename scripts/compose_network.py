@@ -327,6 +327,7 @@ if __name__ == "__main__":
                 backcast["monthly_availability_exclude"].get(carrier, []),
                 backcast["energy_budget_monthly_ceiling"],
                 reported,
+                carrier in backcast["energy_budget_fixed"],
             )
 
     clip_p_min_pu(n)

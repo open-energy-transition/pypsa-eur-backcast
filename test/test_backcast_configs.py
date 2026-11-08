@@ -125,6 +125,7 @@ def test_external_borders_known(scenario):
         ("backcast.nuclear_min_output", False),
         ("backcast.energy_budget_carriers", []),
         ("backcast.energy_budget_eurostat", []),
+        ("backcast.energy_budget_fixed", []),
         ("backcast.chp_floor.enable", False),
         ("backcast.hybrid_capacities.enable", False),
         ("backcast.external_flows.enable", False),

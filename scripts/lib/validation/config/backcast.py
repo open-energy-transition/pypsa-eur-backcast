@@ -253,15 +253,19 @@ class BackcastConfig(ConfigModel):
     )
     energy_budget_carriers: list[str] = Field(
         default_factory=list,
-        description="Generator carriers whose energy over the snapshots (`e_sum_max`) per ENTSO-E area is the actual generation of the area, scaled per month from the hours with data to all hours (every month needs data), raised to the Eurostat value for carriers in `energy_budget_eurostat`, shared by `p_nom` and raised to the must-run energy of `p_min_pu`. With `energy_budget_monthly_ceiling`, their availability (`p_max_pu`) is clipped to the peak hourly actual generation of the month over the capacity of the area. Areas in `monthly_availability_exclude` of the carrier and areas without actual generation of the carrier keep their limits. Requires `foresight: overnight`.",
+        description="Generator carriers whose energy over the snapshots (`e_sum_max`) per ENTSO-E area is the actual generation of the area, scaled per month from the hours with data to all hours (every month needs data), raised to the Eurostat value for carriers in `energy_budget_eurostat`, shared by `p_nom` and raised to the must-run energy of `p_min_pu`. With `energy_budget_monthly_ceiling`, their availability (`p_max_pu`) is clipped to the peak hourly actual generation of the month over the capacity of the area. Carriers in `energy_budget_fixed` follow the hourly actual generation instead. Areas in `monthly_availability_exclude` of the carrier and areas without actual generation of the carrier keep their limits. Requires `foresight: overnight`.",
     )
     energy_budget_monthly_ceiling: bool = Field(
         True,
-        description="Clip the availability (`p_max_pu`) of the `energy_budget_carriers` per ENTSO-E area to the peak hourly actual generation of the month over the capacity of the area.",
+        description="Clip the availability (`p_max_pu`) of the `energy_budget_carriers` per ENTSO-E area to the peak hourly actual generation of the month over the capacity of the area. Carriers in `energy_budget_fixed` are not clipped.",
     )
     energy_budget_eurostat: list[Literal["biomass"]] = Field(
         default_factory=list,
         description="Carriers of `energy_budget_carriers` whose energy per ENTSO-E area is the larger of the actual generation and the Eurostat `nrg_bal_peh` gross electricity production of all producers including autoproducers in the snapshot year (biomass: bioenergy `BIOE` minus renewable municipal waste `W6210`), shared by `p_nom` over the generators of the carrier in each country. ENTSO-E misses most autoproducer output, e.g. FI pulp mills.",
+    )
+    energy_budget_fixed: list[str] = Field(
+        default_factory=list,
+        description="Carriers of `energy_budget_carriers` whose output per ENTSO-E area is fixed (`p_min_pu` = `p_max_pu`) to the hourly actual generation instead of capped by `e_sum_max`, for price-taking heat-led fleets such as biomass CHP whose binding annual cap would set the price. The hourly actual generation is scaled by the energy of the area over the actual energy (the Eurostat uplift of `energy_budget_eurostat`, else 1), shared by `p_nom` and capped at the capacity of the area. Hours without actual generation keep their limits.",
     )
     fuel_price: dict[str, Annotated[float, Field(ge=0)]] = Field(
         default_factory=dict,
@@ -363,7 +367,7 @@ class BackcastConfig(ConfigModel):
 
     @model_validator(mode="after")
     def check_energy_budget_carriers(self) -> "BackcastConfig":
-        """Require no carrier with both monthly availability and energy budget and Eurostat budgets only for budget carriers."""
+        """Require no carrier with both monthly availability and energy budget, Eurostat and fixed budgets only for budget carriers and fixed budgets without the monthly ceiling."""
         overlap = sorted(
             set(self.energy_budget_carriers) & set(self.monthly_availability_carriers)
         )
@@ -375,5 +379,11 @@ class BackcastConfig(ConfigModel):
         )
         assert not unbudgeted, (
             f"backcast: carriers in energy_budget_eurostat but not in energy_budget_carriers: {unbudgeted}"
+        )
+        unbudgeted = sorted(
+            set(self.energy_budget_fixed) - set(self.energy_budget_carriers)
+        )
+        assert not unbudgeted, (
+            f"backcast: carriers in energy_budget_fixed but not in energy_budget_carriers: {unbudgeted}"
         )
         return self

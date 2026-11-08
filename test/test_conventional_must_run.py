@@ -108,7 +108,7 @@ CEILING = [0.5, 0.5, 0.75, 0.75]
 
 
 def budget(n: pypsa.Network, generation: pd.DataFrame, **kwargs) -> None:
-    kwargs = {"monthly_ceiling": True, "reported": NO_REPORT} | kwargs
+    kwargs = {"monthly_ceiling": True, "reported": NO_REPORT, "fixed": False} | kwargs
     apply_energy_budget(n, generation, AREA_TO_BUS, "biomass", ["BE"], **kwargs)
 
 
@@ -139,6 +139,48 @@ def test_energy_budget(
     assert (dense["BE biomass"] == 1.0).all()
 
 
+FIXED = [0.25, 0.5, 0.75, 0.0]
+
+
+@pytest.mark.parametrize(
+    "gap, reported, p_min_pu, p_max_pu",
+    [
+        (False, NO_REPORT, FIXED, FIXED),
+        (False, pd.Series({"PT": 40.0, "BE": 1e3}), FIXED, FIXED),
+        (False, pd.Series({"PT": 72.0, "BE": 1e3}), [0.3, 0.6, 0.9, 0.0], None),
+        (False, pd.Series({"PT": 120.0, "BE": 1e3}), [0.5, 1.0, 1.0, 0.0], None),
+        (True, NO_REPORT, [0.1, 0.5, 0.75, 0.0], [1.0, 0.5, 0.75, 0.0]),
+        (True, pd.Series({"PT": 140.0}), [0.1, 1.0, 1.0, 0.0], [1.0, 1.0, 1.0, 0.0]),
+    ],
+)
+def test_energy_budget_fixed(network, generation, gap, reported, p_min_pu, p_max_pu):
+    network.generators.loc[["PT biomass 1", "PT biomass 2"], "p_min_pu"] = 0.1
+    if gap:
+        generation.iloc[0, 2] = np.nan
+    budget(network, generation, monthly_ceiling=False, reported=reported, fixed=True)
+
+    p_min = network.get_switchable_as_dense("Generator", "p_min_pu")
+    p_max = network.get_switchable_as_dense("Generator", "p_max_pu")
+    for gen in ["PT biomass 1", "PT biomass 2"]:
+        np.testing.assert_allclose(p_min[gen], p_min_pu)
+        np.testing.assert_allclose(p_max[gen], p_max_pu or p_min_pu)
+    assert (network.generators.e_sum_max == np.inf).all()
+    assert (p_max["BE biomass"] == 1.0).all()
+    assert (p_min["BE biomass"] == 0.0).all()
+
+
+@pytest.mark.parametrize(
+    "reported, warning",
+    [(pd.Series({"PT": 120.0}), "PT 1 0.000"), (pd.Series({"PT": 2e6}), "PT 3 2.000")],
+)
+def test_energy_budget_fixed_warns_capped_hours(
+    network, generation, caplog, reported, warning
+):
+    budget(network, generation, monthly_ceiling=False, reported=reported, fixed=True)
+
+    assert f"capped at the capacity, hours and TWh lost: {warning}" in caplog.text
+
+
 def test_energy_budget_shares_reported_country_over_areas():
     area_to_bus = pd.Series(
         {"DK1": "DK_1", "DK2": "DK_2", "DE0": "DE_LU", "LU0": "DE_LU"}
@@ -158,7 +200,9 @@ def test_energy_budget_shares_reported_country_over_areas():
     )
     generation = pd.DataFrame(10.0, index=SNAPSHOTS, columns=columns)
     reported = pd.Series({"DK": 200.0, "DE": 40.0, "LU": 40.0})
-    apply_energy_budget(n, generation, area_to_bus, "biomass", [], False, reported)
+    apply_energy_budget(
+        n, generation, area_to_bus, "biomass", [], False, reported, False
+    )
 
     np.testing.assert_allclose(n.generators.e_sum_max, [150.0, 50.0, 40.0, 40.0])
 
@@ -213,15 +257,19 @@ def test_set_fuel_price_unknown_technology():
 
 
 @pytest.mark.parametrize(
-    "config",
+    "config, match",
     [
-        {
-            "energy_budget_carriers": ["biomass"],
-            "monthly_availability_carriers": ["biomass"],
-        },
-        {"energy_budget_eurostat": ["biomass"]},
+        (
+            {
+                "energy_budget_carriers": ["biomass"],
+                "monthly_availability_carriers": ["biomass"],
+            },
+            "energy_budget_carriers",
+        ),
+        ({"energy_budget_eurostat": ["biomass"]}, "energy_budget_carriers"),
+        ({"energy_budget_fixed": ["biomass"]}, "energy_budget_carriers"),
     ],
 )
-def test_energy_budget_config_invalid(config):
-    with pytest.raises(ValidationError, match="energy_budget_carriers"):
+def test_energy_budget_config_invalid(config, match):
+    with pytest.raises(ValidationError, match=match):
         BackcastConfig(**config)

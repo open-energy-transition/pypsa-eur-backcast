@@ -621,6 +621,7 @@ backcast:
   energy_budget_carriers: []
   energy_budget_monthly_ceiling: true
   energy_budget_eurostat: []
+  energy_budget_fixed: []
   fuel_price: {}
   exclude_generation_areas: []
   hybrid_capacities:

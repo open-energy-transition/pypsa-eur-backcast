@@ -113,9 +113,10 @@ def apply_energy_budget(
     exclude: list[str],
     monthly_ceiling: bool,
     reported: pd.Series,
+    fixed: bool,
 ) -> None:
     """
-    Cap the energy of `carrier` per ENTSO-E area at the larger of the observed and the `reported` energy.
+    Cap the energy of `carrier` per ENTSO-E area at the larger of the observed and the `reported` energy, or with `fixed` fix its hourly output to the observed profile.
 
     The observed energy is scaled per month from the hours with data to all
     hours; every month needs observed data. `reported` holds the annual energy
@@ -123,8 +124,10 @@ def apply_energy_budget(
     the country; leave it empty to cap at the observed energy. ``e_sum_max`` is
     the area energy shared by ``p_nom`` and raised to the must-run energy of
     ``p_min_pu``. With `monthly_ceiling`, ``p_max_pu`` is clipped to the observed
-    hourly peak of the month over the capacity of the area. Areas in `exclude`
-    and areas without observed output keep their limits.
+    hourly peak of the month over the capacity of the area. With `fixed`, the
+    observed hourly output scaled by the area energy over the observed energy
+    is passed to `fix_dispatch` instead. Areas in `exclude` and areas without
+    observed output keep their limits.
     """
     assert_known_areas(exclude, area_to_bus, f"the {carrier} energy budget")
     g = n.generators.query("carrier == @carrier")
@@ -143,11 +146,20 @@ def apply_energy_budget(
         f"Observed {carrier} generation misses whole months in {list(gaps)}."
     )
     monthly = observed.mul(weights, axis=0).groupby(months).sum().div(hours)
-    energy = monthly.mul(month_hours(n), axis=0).sum()
+    observed_energy = monthly.mul(month_hours(n), axis=0).sum()
+    energy = observed_energy
     if not reported.empty:
         countries = g.bus.map(n.buses.country)
         area_reported = reported_area_energy(g.p_nom, countries, areas, reported)
-        energy = np.maximum(energy, area_reported)
+        energy = np.maximum(observed_energy, area_reported)
+    if fixed:
+        scale = energy / observed_energy
+        fix_dispatch(n, areas, capacity, observed.mul(scale))
+        logger.info(
+            f"Fixed the {carrier} output to the observed profile scaled by: "
+            + ", ".join(f"{a} {f:.3f}" for a, f in scale.items())
+        )
+        return
     p_max_pu = n.get_switchable_as_dense("Generator", "p_max_pu", inds=gens)
     if monthly_ceiling:
         peak = observed.groupby(months).transform("max").div(capacity).clip(upper=1)
@@ -170,6 +182,31 @@ def apply_energy_budget(
         f"Set the {carrier} energy budget of {sorted(capacity.index)} in TWh: "
         + ", ".join(f"{a} {e / 1e6:.3f}" for a, e in energy.items())
     )
+
+
+def fix_dispatch(
+    n: pypsa.Network, areas: pd.Series, capacity: pd.Series, profile: pd.DataFrame
+) -> None:
+    """
+    Fix ``p_min_pu`` and ``p_max_pu`` of the generators in `areas` to the hourly `profile` in MW per area over the `capacity` of the area.
+
+    The output is capped at the capacity, with a warning naming the hours and
+    the energy lost per area. Hours without `profile` keep their limits.
+    """
+    gens = areas.index
+    excess = profile.sub(capacity).clip(lower=0)
+    lost = excess.mul(n.snapshot_weightings.generators, axis=0).sum()
+    capped = (excess > 0).sum()
+    capped = capped[capped > 0]
+    if not capped.empty:
+        logger.warning(
+            "Fixed output capped at the capacity, hours and TWh lost: "
+            + ", ".join(f"{a} {h} {lost[a] / 1e6:.3f}" for a, h in capped.items())
+        )
+    share = profile.div(capacity).clip(upper=1)[areas].set_axis(gens, axis=1)
+    for attr in ["p_min_pu", "p_max_pu"]:
+        limit = n.get_switchable_as_dense("Generator", attr, inds=gens)
+        set_switchable(n, attr, share.fillna(limit))
 
 
 def reported_area_energy(
