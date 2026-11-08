@@ -28,6 +28,10 @@ and hydro power. Their outputs are attached to the clustered network by
 
 {{ rules("build_unavailability") }}
 
+## Heat-led CHP floor
+
+{{ rules("build_chp_floor") }}
+
 ## Cross-border capacities
 
 {{ rules("build_cross_border_capacities") }}

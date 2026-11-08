@@ -12,7 +12,13 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
-from scripts.lib.backcast_plotting import CARRIER_GROUPS, STACK, cet_hour
+from scripts.lib.backcast_plotting import (
+    CARRIER_GROUPS,
+    STACK,
+    ZONE_GROUPS,
+    cet_hour,
+    ordered_areas,
+)
 
 if TYPE_CHECKING:
     import pypsa
@@ -76,6 +82,44 @@ def price_metrics(model: pd.DataFrame, observed: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(metrics).rename_axis("bus")
 
 
+def area_metrics(metrics: pd.DataFrame, area_to_bus: pd.Series) -> pd.DataFrame:
+    """Average per-bus rows over the buses of each price area, so that each area counts once."""
+    return metrics.groupby(area_to_bus[metrics.index].rename("area")).mean()
+
+
+def summary_metrics(metrics: pd.DataFrame) -> pd.Series:
+    """Summarise per-bus or per-area metrics into the headline numbers of the acceptance rule."""
+    at_or_below_zero = {
+        f"share_le0_{name}": (
+            metrics[f"zero_share_{name}"] + metrics[f"negative_share_{name}"]
+        ).mean()
+        for name in ["model", "observed"]
+    }
+    return pd.Series(
+        {
+            "median_mae": metrics.mae.median(),
+            "mean_mae": metrics.mae.mean(),
+            "pearson_r": metrics.pearson_r.median(),
+            "abs_bias": metrics.mean_bias.abs().median(),
+            "std_ratio": metrics.std_ratio.median(),
+            **at_or_below_zero,
+            "count": len(metrics),
+        }
+    )
+
+
+def zone_group_metrics(metrics: pd.DataFrame) -> pd.DataFrame:
+    """Compute the median MAE, bias and correlation per zone group from per-area metrics."""
+    group = pd.Series(
+        {area: name for name, areas in ZONE_GROUPS.items() for area in areas}
+    )
+    areas = ordered_areas(metrics.index)
+    grouped = metrics.loc[areas, ["mae", "mean_bias", "pearson_r"]].groupby(
+        group[areas].rename("group"), sort=False
+    )
+    return grouped.median().assign(count=grouped.size())
+
+
 def monthly_bias(model: pd.DataFrame, observed: pd.DataFrame) -> pd.DataFrame:
     """Compute the mean bias per year-month and bus."""
     error = model - observed
@@ -110,6 +154,14 @@ def hourly_errors(error: pd.DataFrame, months: list[int]) -> pd.DataFrame:
     """Compute the mean error per area and hour of day (CET) in the months."""
     selected = error[error.index.month.isin(months)]
     return selected.groupby(cet_hour(selected.index)).mean().T
+
+
+def hourly_area_bias(
+    model: pd.DataFrame, observed: pd.DataFrame, area_to_bus: pd.Series
+) -> pd.Series:
+    """Compute the median over price areas of the mean error per hour of day (CET)."""
+    errors = hourly_errors(model - observed, list(range(1, 13)))
+    return area_metrics(errors, area_to_bus).median().rename_axis("hour").rename("bias")
 
 
 def stacked_generation(

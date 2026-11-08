@@ -6,7 +6,11 @@ import pandas as pd
 import pypsa
 import pytest
 
-from scripts.solve_network import add_co2_atmosphere_constraint, emission_stores
+from scripts.solve_network import (
+    add_co2_atmosphere_constraint,
+    collect_kwargs,
+    emission_stores,
+)
 
 
 @pytest.fixture(scope="function")
@@ -78,3 +82,20 @@ def test_emission_stores_selects_accumulating_stores(
     ]
     co2_network.stores.loc["co2 atmosphere", "e_cyclic"] = True
     assert emission_stores(co2_network, pd.Index(["co2"])).empty
+
+
+@pytest.mark.parametrize(
+    "io_api,expected", [(None, {}), ("direct", {"io_api": "direct"})]
+)
+def test_collect_kwargs_passes_io_api_only_when_set(
+    io_api: str | None, expected: dict
+) -> None:
+    solving = {
+        "solver": {"name": "gurobi", "options": None},
+        "solver_options": {},
+        "options": {"io_api": io_api, "horizon": 168, "overlap": 0},
+    }
+    kwargs, _ = collect_kwargs(
+        {"foresight": "overnight"}, solving, mode="rolling_horizon"
+    )
+    assert {k: v for k, v in kwargs.items() if k == "io_api"} == expected

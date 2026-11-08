@@ -97,6 +97,8 @@ solving:
     noisy_costs: false
 
 backcast:
+  chp_floor:
+    enable: true
   exclude_price_buses: [FR15]
   max_price_gap_hours_by_area:
     IE_SEM: 25

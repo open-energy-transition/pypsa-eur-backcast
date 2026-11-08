@@ -6,8 +6,11 @@ Builds hourly observed day-ahead electricity prices per bus of the bidding zone 
 
 The ENTSO-E prices per bidding zone are converted to UTC, resampled to hourly
 means and restricted to the snapshots. Prices published in a local currency are
-converted to EUR with the ECB euro reference rate of their UTC day, or the last
-published rate on days without one (weekends and TARGET holidays). Gaps of up to
+converted to EUR per price, as the currency may change within a year (RO from
+RON to EUR in June 2021, BG from BGN to EUR in January 2022), with the ECB euro
+reference rate of their UTC day, or the last published rate on days without one
+(weekends and TARGET holidays). BGN is converted at its fixed peg of 1.95583 per
+EUR, which the ECB publishes rounded to 1.9558. Gaps of up to
 ``MAX_INTERPOLATE_PRICE_GAP_HOURS`` are interpolated, gaps up to
 ``backcast: max_price_gap_hours`` (or the area specific value in
 ``backcast: max_price_gap_hours_by_area``) are kept as missing values and longer
@@ -29,37 +32,55 @@ from scripts.lib.validation.config.backcast import MAX_INTERPOLATE_PRICE_GAP_HOU
 
 logger = logging.getLogger(__name__)
 
+EUR_PEGS = {"BGN": 1.95583}
+
 
 def to_hourly_utc(prices: pd.Series) -> pd.Series:
     """Convert timezone-aware prices to hourly means with naive UTC timestamps."""
     return prices.tz_convert("UTC").resample("h").mean().tz_localize(None)
 
 
-def read_prices(path: str) -> tuple[pd.Series, str]:
-    """Read the retrieved prices of one area and their currency, EUR for files retrieved before the currency was stored."""
+def read_prices(path: str) -> tuple[pd.Series, pd.Series]:
+    """Read the retrieved prices of one area and the currency of each price."""
     frame = pd.read_csv(path, index_col=0, parse_dates=True)
-    currency = frame.pop("currency").iloc[0] if "currency" in frame else "EUR"
+    assert "currency" in frame, f"No currency column in {path}, retrieve it again"
+    currency = frame.pop("currency")
     return frame.squeeze("columns"), currency
 
 
 def read_exchange_rates(path: str) -> pd.DataFrame:
-    """Read the daily ECB reference rates in units of each currency per EUR."""
-    return pd.read_csv(
+    """Read the daily ECB reference rates in units of each currency per EUR, with pegged currencies at their unrounded peg."""
+    rates = pd.read_csv(
         path, index_col="Date", parse_dates=True, na_values="N/A"
     ).sort_index()
+    pegs = {c: rates[c].mask(rates[c].notna(), peg) for c, peg in EUR_PEGS.items()}
+    return rates.assign(**pegs)
 
 
-def to_eur(prices: pd.Series, currency: str, rates: pd.DataFrame) -> pd.Series:
-    """Convert hourly prices with naive UTC timestamps to EUR with the reference rate of their day or the last one before."""
+def daily_rate(days: pd.Series, currency: str, rates: pd.DataFrame) -> pd.Series:
+    """Return the reference rate of each day or the last one before, 1 for EUR."""
     if currency == "EUR":
-        return prices
-    logger.info(f"Converting day-ahead prices of {prices.name} from {currency} to EUR.")
+        return pd.Series(1.0, days.index)
     rate = rates[currency].dropna()
-    days = prices.index.normalize()
     assert days.min() >= rate.index[0] and days.max() <= rate.index[-1], (
-        f"No ECB {currency} rate for all days of {prices.name}"
+        f"No ECB {currency} rate for all days of {days.name}"
     )
-    return prices / rate.reindex(days, method="ffill").to_numpy()
+    return pd.Series(rate.reindex(days, method="ffill").to_numpy(), days.index)
+
+
+def to_eur(prices: pd.Series, currency: pd.Series, rates: pd.DataFrame) -> pd.Series:
+    """Convert timezone-aware prices to EUR with the reference rate of the UTC day of each price or the last one before."""
+    foreign = sorted(set(currency) - {"EUR"})
+    if foreign:
+        logger.info(
+            f"Converting day-ahead prices of {prices.name} from {foreign} to EUR."
+        )
+    utc_days = prices.index.tz_convert("UTC").tz_localize(None).normalize()
+    days = pd.Series(utc_days, prices.index, name=prices.name)
+    rate = pd.concat(
+        [daily_rate(group, code, rates) for code, group in days.groupby(currency)]
+    )
+    return prices / rate.reindex(prices.index).to_numpy()
 
 
 def map_areas_to_buses(
@@ -96,7 +117,7 @@ if __name__ == "__main__":
     rates = read_exchange_rates(snakemake.input.exchange_rates)
     raw = [read_prices(fn) for fn in snakemake.input.prices]
     hourly = pd.concat(
-        [to_eur(to_hourly_utc(s), currency, rates) for s, currency in raw],
+        [to_hourly_utc(to_eur(s, currency, rates)) for s, currency in raw],
         keys=[s.name for s, _ in raw],
     ).unstack(level=0)
 

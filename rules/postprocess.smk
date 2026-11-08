@@ -254,8 +254,10 @@ rule evaluate_price_backcast:
     input:
         network=backcast_network,
         prices=resources("day_ahead_prices.csv"),
+        area_to_bus=config_provider("backcast", "area_to_bus"),
     output:
         metrics=RESULTS + "backcast/price_metrics.csv",
+        area_metrics=RESULTS + "backcast/price_metrics_area.csv",
         monthly_bias=RESULTS + "backcast/price_monthly_bias.csv",
         plots=RESULTS + "backcast/price_evaluation.pdf",
     log:

@@ -115,6 +115,9 @@ def get_compose_inputs(w):
         unavailability_coverage=(
             resources("unavailability_coverage.csv") if unavailability else []
         ),
+        chp_floor=(
+            resources("chp_floor.csv") if cfg["backcast"]["chp_floor"]["enable"] else []
+        ),
         solar_rooftop_potentials=(
             resources("solar_rooftop_potentials.csv")
             if "solar" in cfg["electricity"]["renewable_carriers"]
