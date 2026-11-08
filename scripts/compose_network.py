@@ -40,17 +40,27 @@ from scripts.add_electricity import (
     sanitize_locations,
 )
 from scripts.add_existing_baseyear import main as add_existing_capacities
+from scripts.build_cross_border_capacities import read_retrieved
 from scripts.lib.backcast_calibration import (
     apply_monthly_availability,
+    calibrate_solar,
     calibrate_wind,
     read_generation,
 )
 from scripts.lib.conventional import (
     apply_chp_floor,
+    apply_energy_budget,
+    apply_nuclear_min_output,
     clip_p_min_pu,
+    set_fuel_price,
     spread_marginal_cost,
 )
-from scripts.lib.cross_border import apply_cross_border_capacities, raise_to_physical
+from scripts.lib.cross_border import (
+    add_external_flows,
+    apply_cross_border_capacities,
+    external_net_imports,
+    raise_to_physical,
+)
 from scripts.lib.entsoe import assert_known_areas, read_area_to_bus
 from scripts.lib.unavailability import apply_unavailability
 from scripts.prepare_network import (
@@ -76,10 +86,11 @@ def apply_backcast(
     """Apply the ENTSO-E cross-border capacities and the backcast calibration."""
     ntc = electricity["cross_border_capacities"] == "ntc"
     wind = backcast["calibrate_wind"]
+    solar = backcast["calibrate_solar"]
     nuclear = backcast["monthly_nuclear_availability"]
     carriers = backcast["monthly_availability_carriers"]
     unavailability = backcast["unavailability"]
-    if not (ntc or wind or nuclear or carriers or unavailability["enable"]):
+    if not (ntc or wind or solar or nuclear or carriers or unavailability["enable"]):
         return
     area_to_bus = read_area_to_bus(inputs.area_to_bus)
     if ntc:
@@ -99,7 +110,7 @@ def apply_backcast(
                 hybrid["areas"],
             )
         apply_cross_border_capacities(n, capacities, area_to_bus)
-    if wind or nuclear or carriers:
+    if wind or solar or nuclear or carriers:
         generation = read_generation(inputs.entsoe_generation)
     if wind:
         calibrate_wind(
@@ -110,6 +121,15 @@ def apply_backcast(
             backcast["wind_calibration_exclude"],
             backcast["wind_calibration_factor_bounds"],
             backcast["wind_target_twh"],
+        )
+    if solar:
+        calibrate_solar(
+            n,
+            generation,
+            area_to_bus,
+            backcast["solar_calibration_exclude"],
+            backcast["solar_calibration_factor_bounds"],
+            pd.read_csv(inputs.solar_self_consumption, index_col="country").share,
         )
     if nuclear:
         apply_monthly_availability(
@@ -146,18 +166,27 @@ def apply_backcast(
         )
 
 
-def read_observed_generation(
-    inputs: InputFiles, exclude_areas: list[str]
-) -> tuple[pd.DataFrame, pd.Series]:
-    """Read the hourly ENTSO-E generation per area and carrier without `exclude_areas` and the area-to-bus map."""
+def apply_external_flows(
+    n: pypsa.Network, inputs: InputFiles, areas: list[str], source: str
+) -> None:
+    """Add the hourly exchanges with the external `areas` as fixed flows at their border buses."""
     area_to_bus = read_area_to_bus(inputs.area_to_bus)
-    assert_known_areas(
-        exclude_areas, area_to_bus, "conventional.marginal_cost_spread.exclude_areas"
-    )
+    borders = pd.read_csv(inputs.external_borders)
+    unknown = sorted(set(areas) - set(borders.external_area))
+    assert not unknown, f"backcast: external_flows: areas without border: {unknown}"
+    modelled = set(area_to_bus[area_to_bus.index.isin(n.buses.index)])
+    borders = borders[borders.external_area.isin(areas) & borders.area.isin(modelled)]
+    data = read_retrieved(inputs.external_exchanges)
+    net_imports = external_net_imports(data, borders, n.snapshots, source)
+    add_external_flows(n, net_imports, borders, area_to_bus)
+
+
+def read_observed_generation(inputs: InputFiles) -> tuple[pd.DataFrame, pd.Series]:
+    """Read the hourly ENTSO-E generation per area and carrier and the area-to-bus map."""
     generation = pd.read_csv(
         inputs.entsoe_generation_hourly, index_col=0, header=[0, 1], parse_dates=True
-    ).drop(columns=exclude_areas, level="area", errors="ignore")
-    return generation, area_to_bus
+    )
+    return generation, read_area_to_bus(inputs.area_to_bus)
 
 
 if __name__ == "__main__":
@@ -196,10 +225,17 @@ if __name__ == "__main__":
     n_previous = None if is_first_horizon else pypsa.Network(inputs.network_previous)
     nyears = n.snapshot_weightings.objective.sum() / 8760.0
     costs = load_costs(snakemake.input.tech_costs)
+    set_fuel_price(costs, params.backcast["fuel_price"])
 
     add_electricity_components(n, inputs, params, costs)
 
     apply_backcast(n, inputs, params.electricity, params.backcast)
+
+    external_flows = params.backcast["external_flows"]
+    if external_flows["enable"]:
+        apply_external_flows(
+            n, inputs, external_flows["areas"], external_flows["source"]
+        )
 
     if sector_mode:
         add_sector_components(n, inputs, params, costs, nyears, current_horizon)
@@ -244,18 +280,45 @@ if __name__ == "__main__":
         )
         apply_chp_floor(n, floor, chp_floor["replace_p_min_pu"])
 
-    clip_p_min_pu(n)
+    backcast = params.backcast
     spread = params.conventional["marginal_cost_spread"]
+    observed_spread = spread["enable"] and spread["reference"] == "observed"
+    budget_carriers = backcast["energy_budget_carriers"]
+    if observed_spread or backcast["nuclear_min_output"] or budget_carriers:
+        generation, area_to_bus = read_observed_generation(inputs)
+    if backcast["nuclear_min_output"]:
+        apply_nuclear_min_output(
+            n,
+            generation,
+            area_to_bus,
+            backcast["nuclear_area_map"],
+            backcast["nuclear_load_following"],
+        )
+    for carrier in budget_carriers:
+        apply_energy_budget(
+            n,
+            generation,
+            area_to_bus,
+            carrier,
+            backcast["monthly_availability_exclude"].get(carrier, []),
+        )
+
+    clip_p_min_pu(n)
     if spread["enable"]:
         assert foresight == "overnight", (
             "conventional.marginal_cost_spread requires overnight foresight, got "
             f"'{foresight}'."
         )
-        observed = (
-            read_observed_generation(inputs, spread["exclude_areas"])
-            if spread["reference"] == "observed"
-            else (None, None)
-        )
+        observed = (None, None)
+        if observed_spread:
+            exclude = spread["exclude_areas"]
+            assert_known_areas(
+                exclude, area_to_bus, "conventional.marginal_cost_spread.exclude_areas"
+            )
+            observed = (
+                generation.drop(columns=exclude, level="area", errors="ignore"),
+                area_to_bus,
+            )
         spread_marginal_cost(
             n, spread["carriers"], spread["spread"], spread["utilisation"], *observed
         )

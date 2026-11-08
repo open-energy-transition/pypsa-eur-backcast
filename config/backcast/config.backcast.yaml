@@ -32,6 +32,10 @@ renewable:
     flatten_dispatch: true
     flatten_dispatch_buffer: 0.2
     PHS_max_hours_cap: geth2015
+    # Inflow per bidding zone from the ENTSO-E water balance (actual generation of run-of-river and reservoir hydro
+    # plus the weekly reservoir filling change, Transparency Platform 16.1.B/C and 16.1.D), reservoir energy capacity
+    # from the maximum observed filling. Experiment E5 in dev/day-ahead-backcast/converge/hydro.md, plan item 1.5.
+    inflow_source: entsoe_balance
 
 conventional:
   dynamic_fuel_price: true
@@ -42,7 +46,7 @@ conventional:
   nuclear:
     p_min_pu: 0.3
   lignite:
-    p_min_pu: 0.3
+    p_min_pu: data/backcast_lignite_p_min_pu.csv  # 0.3, except EE oil shale and FI peat at the lowest monthly capacity factor of the year: ENTSO-E actual generation 16.1.B/C (data/entsoe_actual_generation) over installed capacity 16.1.A (dev/backcast-accuracy/fleet-audit/raw), built by dev/backcast-accuracy/fleet-gaps/lignite_p_min_pu.py
   biomass:
     p_min_pu: 0.3
   waste:
@@ -99,6 +103,10 @@ solving:
 backcast:
   chp_floor:
     enable: true
+  # Fixed hourly exchanges with areas outside the model from the ENTSO-E Transparency Platform total scheduled
+  # commercial exchanges (12.1.F) and physical flows (12.1.G) for FI-RU, borders and sources in data/entsoe_external_borders.csv (plan item 1.6, #12).
+  external_flows:
+    enable: true
   exclude_price_buses: [FR15]
   max_price_gap_hours_by_area:
     IE_SEM: 25
@@ -127,7 +135,39 @@ backcast:
     NO_5: [onwind]
     SI: [onwind]
     XK: [onwind]
+  # Solar availability scaled to ENTSO-E actual solar generation (16.1.B/C), which is grid-fed like ENTSO-E load.
+  # Excluded areas keep the atlite profile minus the cited self-consumed share in data/solar_self_consumption.csv.
+  # Each share applies to every backcast year (reference_year is documentation only); for AT before 2023 it is likely too high, as the feed-in-tariff fleet was a larger fraction.
+  # Factors are ENTSO-E solar over model available solar of the backcast composed networks 2019/2020/2023/2024; 2021, 2022 and 2025 are not checked yet.
+  calibrate_solar: true
+  solar_calibration_factor_bounds: [0.35, 2.0]
+  solar_calibration_exclude:
+  - AT  # 0.34/0.33/0.32/0.59, ENTSO-E misses most rooftop PV
+  - BA  # 0.22 in 2023
+  - CH  # 0.14 in 2019, ENTSO-E covers a fraction of the fleet (PR #24 balance)
+  - GR  # ENTSO-E solar incomplete (PR #24 balance)
+  - HR  # 0.20 in 2023
+  - IE_SEM  # no solar before 2024, 0 in 2024 from 1464 h
+  - LV  # 0 in 2023 from 744 h
+  - ME  # 0 in 2023
+  - MK  # ENTSO-E solar incomplete (PR #24 balance)
+  - NL  # 0.01-0.03, ENTSO-E misses rooftop PV (PR #24 balance)
+  - SE_1  # 0.01
+  - SE_2  # 0.18
+  - SI  # 0.26 in 2023
   monthly_nuclear_availability: true
+  # Nuclear minimum output per area and month from the lowest hourly ENTSO-E nuclear generation (plan item 1.2).
+  nuclear_min_output: true
+  nuclear_load_following:
+    # EDF units vary between 20 % and 100 % of rated power within 30 minutes, twice a day
+    # (Morilhat et al. 2019, Nuclear Power Plant flexibility at EDF, HAL hal-01977209).
+    FR: 0.2
+  fuel_price:
+    # WNA, Economics of Nuclear Power (prices of September 2021): front-end fuel cost USD 1663 per kg U as UO2 fuel at a burn-up of
+    # 45,000 MWd per tonne U = 1080 MWh_th/kg U, i.e. 1.540 USD/MWh_th (0.46 US cents/kWh_e at 360,000 kWh_e/kg); divided by the ECB
+    # EUR/USD reference rate of September 2021, 1.1770, this is 1.31 EUR/MWh_th. Back-end costs (WNA: up to 10 % of the
+    # cost per kWh) are left out. Replaces the technology data value of 7.45 EUR/MWh_th.
+    nuclear: 1.31
   hybrid_capacities:
     enable: true
     physical_factor: 0.49

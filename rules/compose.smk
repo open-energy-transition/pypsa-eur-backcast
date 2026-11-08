@@ -24,16 +24,24 @@ def get_compose_inputs(w):
     import_carriers = sector["imports"]["price"] if sector["imports"]["enable"] else {}
     calibrate = (
         cfg["backcast"]["calibrate_wind"]
+        or cfg["backcast"]["calibrate_solar"]
         or cfg["backcast"]["monthly_nuclear_availability"]
         or cfg["backcast"]["monthly_availability_carriers"]
     )
     spread = cfg["conventional"]["marginal_cost_spread"]
     observed_spread = spread["enable"] and spread["reference"] == "observed"
     unavailability = cfg["backcast"]["unavailability"]["enable"]
+    observed_hourly = (
+        observed_spread
+        or cfg["backcast"]["nuclear_min_output"]
+        or cfg["backcast"]["energy_budget_carriers"]
+    )
+    external_flows = cfg["backcast"]["external_flows"]["enable"]
     needs_area_to_bus = (
-        elec["cross_border_capacities"] == "ntc"
+        external_flows
+        or elec["cross_border_capacities"] == "ntc"
         or calibrate
-        or observed_spread
+        or observed_hourly
         or unavailability
     )
 
@@ -105,11 +113,18 @@ def get_compose_inputs(w):
             else []
         ),
         area_to_bus=cfg["backcast"]["area_to_bus"] if needs_area_to_bus else [],
+        external_borders=("data/entsoe_external_borders.csv" if external_flows else []),
+        external_exchanges=input_external_exchanges(w),
         entsoe_generation_hourly=(
-            resources("entsoe_generation_hourly.csv") if observed_spread else []
+            resources("entsoe_generation_hourly.csv") if observed_hourly else []
         ),
         entsoe_generation=(
             resources("entsoe_generation_monthly.csv") if calibrate else []
+        ),
+        solar_self_consumption=(
+            "data/solar_self_consumption.csv"
+            if cfg["backcast"]["calibrate_solar"]
+            else []
         ),
         unavailability=resources("unavailability.csv") if unavailability else [],
         unavailability_coverage=(

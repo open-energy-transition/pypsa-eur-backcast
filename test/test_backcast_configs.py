@@ -88,7 +88,9 @@ def test_areas_known(scenario):
         "wind_curtailment_twh": backcast.get("wind_curtailment_twh", {}),
         "nuclear_phase_out": backcast.get("nuclear_phase_out", {}),
         "monthly_availability_exclude": [
-            a for areas in backcast.get("monthly_availability_exclude", {}).values() for a in areas
+            a
+            for areas in backcast.get("monthly_availability_exclude", {}).values()
+            for a in areas
         ],
     }
     for key, areas in configured.items():
@@ -96,3 +98,83 @@ def test_areas_known(scenario):
         assert not unknown, (
             f"backcast: {key} names areas outside the area map: {unknown}"
         )
+
+
+def test_external_borders_known(scenario):
+    _, _, config = scenario
+    defaults = yaml.safe_load((ROOT / "config/config.default.yaml").read_text())
+    update_config(defaults, config)
+    area_to_bus = read_area_to_bus(ROOT / defaults["backcast"]["area_to_bus"])
+    modelled = set(area_to_bus[area_to_bus.index.str[:2].isin(defaults["countries"])])
+    borders = pd.read_csv(ROOT / "data/entsoe_external_borders.csv")
+    external = set(defaults["backcast"]["external_flows"]["areas"])
+    assert set(borders.area) <= modelled
+    assert external <= set(borders.external_area) <= set(Area.__members__)
+    assert not external & modelled
+
+
+ENTSOE_INSTALLED = pd.read_csv(ROOT / "test/test_data/backcast_installed_capacity.csv")
+
+
+def test_custom_powerplants_match_entsoe(scenario):
+    _, year, config = scenario
+    custom = pd.read_csv(ROOT / "data/custom_powerplants.csv").query(
+        config["electricity"]["custom_powerplants"]
+    )
+    assert custom.Source.notna().all()
+    fleet = custom.groupby(["Country", "Fueltype"]).Capacity.sum()
+    reference = ENTSOE_INSTALLED.query("year == @year")
+    assert not reference.empty
+    for row in reference.itertuples():
+        key = (row.country, row.fueltype)
+        assert fleet[key] == pytest.approx(row.capacity_mw, abs=150), key
+
+
+def test_lignite_p_min_pu_covers_countries(scenario):
+    _, year, config = scenario
+    p_min_pu = config["conventional"]["lignite"]["p_min_pu"]
+    if not isinstance(p_min_pu, str):
+        return
+    table = pd.read_csv(ROOT / p_min_pu, index_col=0)
+    assert str(year) in table.columns
+    countries = yaml.safe_load((ROOT / "config/config.default.yaml").read_text())[
+        "countries"
+    ]
+    assert set(countries) <= set(table.index)
+    assert table[str(year)].between(0, 1).all()
+
+
+ALL_YEARS = range(2019, 2026)
+
+
+@pytest.mark.parametrize(
+    "country,name,fueltype,dropped",
+    [
+        ("FI", "Olkiluoto 1", "Nuclear", ALL_YEARS),
+        ("FI", "Alholmens Kraft", "Bioenergy", ALL_YEARS),
+        ("FI", "Haapavesi", "Lignite", ALL_YEARS),
+        ("FI", "Naantali Chp", "Hard Coal", range(2021, 2026)),
+        ("FI", "Meri-Pori", "Hard Coal", range(0)),
+        ("BA", "Capljina", "Hydro", ALL_YEARS),
+        ("BA", "Tuzla", "Lignite", ALL_YEARS),
+        ("BA", "Stanari", "Lignite", range(0)),
+        ("EE", "Kiisa Erpp", "Oil", ALL_YEARS),
+        ("EE", "Iru Elektrijaam", "Natural Gas", ALL_YEARS),
+        ("SE", "Stenungsund", "Oil", ALL_YEARS),
+        ("SE", "Oresundsverket", "Oil", range(2019, 2025)),
+        ("SE", "Karlshamn", "Oil", range(0)),
+    ],
+)
+def test_powerplants_filter_replaces_fleet(scenario, country, name, fueltype, dropped):
+    _, year, config = scenario
+    ppl = pd.DataFrame(
+        {
+            "Country": [country],
+            "Name": [name],
+            "Fueltype": [fueltype],
+            "DateIn": [1990.0],
+            "DateOut": [float("nan")],
+        }
+    )
+    kept = len(ppl.query(config["electricity"]["powerplants_filter"])) == 1
+    assert kept == (year not in dropped)
