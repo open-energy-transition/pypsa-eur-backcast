@@ -7,6 +7,7 @@ Calibration of generator availabilities to the actual generation reported by the
 
 import logging
 
+import numpy as np
 import pandas as pd
 import pypsa
 
@@ -15,6 +16,7 @@ from scripts.lib.entsoe import assert_known_areas
 logger = logging.getLogger(__name__)
 
 WIND_CARRIERS = ["onwind", "offwind"]
+SOLAR_CARRIERS = ["solar", "solar-hsat", "solar rooftop"]
 CLIP_TOLERANCE = 0.01
 
 
@@ -54,6 +56,66 @@ def check_clipping(label: str, target: float, clipped: float) -> None:
     logger.info(message)
     if abs(target - clipped) > CLIP_TOLERANCE * target:
         logger.warning(f"Clipping loses more than {CLIP_TOLERANCE:.0%} of {message}")
+
+
+def available_energy(n: pypsa.Network, gens: pd.Index, mask: np.ndarray) -> float:
+    """Return the available energy in MWh of `gens` over the snapshots in `mask`."""
+    p_max_pu = n.generators_t.p_max_pu.loc[mask, gens]
+    weights = n.snapshot_weightings.generators[mask]
+    return p_max_pu.mul(n.generators.p_nom[gens]).mul(weights, axis=0).sum().sum()
+
+
+def scale_availability(
+    n: pypsa.Network,
+    gens: pd.Index,
+    mask: np.ndarray,
+    target: float,
+    factor_bounds: list[float],
+    kind: str,
+    label: str,
+) -> None:
+    """
+    Scale the time-varying ``p_max_pu`` of `gens` so that their available energy over `mask` matches `target`.
+
+    One factor applies to all `gens` and snapshots, ``p_max_pu`` is clipped
+    at 1. A factor outside `factor_bounds` raises an error naming `label`
+    and the ``backcast`` keys of `kind` to change.
+    """
+    before = available_energy(n, gens, mask)
+    assert before > 0, (
+        f"{kind.capitalize()} target or actual generation of {label} without generators."
+    )
+    factor = target / before
+    lower, upper = factor_bounds
+    assert lower <= factor <= upper, (
+        f"{kind.capitalize()} calibration factor {factor:.2f} of {label} is outside "
+        f"the bounds [{lower}, {upper}]. Add {label} to backcast: "
+        f"{kind}_calibration_exclude or widen backcast: {kind}_calibration_factor_bounds."
+    )
+    p_max_pu = n.generators_t.p_max_pu
+    p_max_pu[gens] = (p_max_pu[gens] * factor).clip(upper=1)
+    check_clipping(
+        f"Calibrated {label} over {mask.sum()} snapshots "
+        f"from {before / 1e6:.2f} TWh (x{factor:.2f})",
+        target,
+        available_energy(n, gens, mask),
+    )
+
+
+def area_energy(
+    n: pypsa.Network, generation: pd.DataFrame, carriers: list[str]
+) -> pd.Series:
+    """Return the actual energy in MWh per area, carrier and month scaled from the hours with data to the hours of the month."""
+    power = carrier_generation(generation, carriers)
+    return power * month_hours(n).reindex(power.index.get_level_values("month")).values
+
+
+def assert_time_varying(n: pypsa.Network, gens: pd.Index, kind: str) -> None:
+    """Assert that all `gens` have a time-varying ``p_max_pu``."""
+    static = gens.difference(n.generators_t.p_max_pu.columns)
+    assert static.empty, (
+        f"{kind.capitalize()} generators without time-varying p_max_pu: {static.tolist()}"
+    )
 
 
 def calibrate_wind(
@@ -121,40 +183,27 @@ def calibrate_wind(
     g = n.generators
     wind = g.index[g.carrier.str.startswith(tuple(WIND_CARRIERS))]
     assert_mapped(g.loc[wind], area_to_bus)
-    p_max_pu = n.generators_t.p_max_pu
-    static = wind.difference(p_max_pu.columns)
-    assert static.empty, (
-        f"Wind generators without time-varying p_max_pu: {static.tolist()}"
-    )
+    assert_time_varying(n, wind, "wind")
     gen_areas = g.bus.map(area_to_bus)
-    weights = n.snapshot_weightings.generators
     months = snapshot_months(n)
-    power = carrier_generation(generation, WIND_CARRIERS)
-    energy = (
-        power * month_hours(n).reindex(power.index.get_level_values("month")).values
-    )
-    lower, upper = factor_bounds
-
-    def available(p_max_pu: pd.DataFrame, mask: pd.Series) -> float:
-        p_nom = g.p_nom[p_max_pu.columns]
-        return p_max_pu.loc[mask].mul(p_nom).mul(weights[mask], axis=0).sum().sum()
+    energy = area_energy(n, generation, WIND_CARRIERS)
 
     for area in area_to_bus.unique():
-        area_energy = (
+        actual = (
             energy[area].groupby(level="carrier").sum()
             if area in energy.index.unique("area")
             else pd.Series(dtype=float)
         )
         value = curtailment_twh.get(area, 0.0)
         covered = (
-            set(value) <= set(area_energy.index)
+            set(value) <= set(actual.index)
             if isinstance(value, dict)
-            else not value or not area_energy.empty
+            else not value or not actual.empty
         )
         assert covered, (
             f"Wind curtailment given for {area} without actual generation of its wind carriers."
         )
-        curtailment = carrier_curtailment(value, area_energy)
+        curtailment = carrier_curtailment(value, actual)
         for carrier in WIND_CARRIERS:
             gens = g.index[gen_areas.eq(area) & g.carrier.str.startswith(carrier)]
             capacity = g.p_nom[gens].sum()
@@ -162,13 +211,13 @@ def calibrate_wind(
                 logger.info(f"Excluded {carrier} in {area} from the wind calibration.")
                 continue
             if carrier in target_twh.get(area, {}):
-                mask = pd.Series(True, n.snapshots)
+                mask = np.full(len(n.snapshots), True)
                 target = target_twh[area][carrier] * 1e6
-            elif carrier in area_energy.index:
+            elif carrier in actual.index:
                 mask = months.isin(energy[area][carrier].index)
-                target = area_energy[carrier] + curtailment[carrier]
+                target = actual[carrier] + curtailment[carrier]
             elif area in published and capacity > 0:
-                p_max_pu[gens] = 0.0
+                n.generators_t.p_max_pu[gens] = 0.0
                 logger.warning(
                     f"No actual {carrier} generation published for {area}, setting "
                     f"the availability of its {capacity:.0f} MW to zero."
@@ -180,24 +229,105 @@ def calibrate_wind(
                         f"No actual {carrier} generation for {area}, keeping its availability."
                     )
                 continue
-            before = available(p_max_pu[gens], mask)
-            assert before > 0, (
-                f"Wind target or actual {carrier} generation in {area} without {carrier} generators."
+            scale_availability(
+                n, gens, mask, target, factor_bounds, "wind", f"{carrier} in {area}"
             )
-            factor = target / before
-            assert lower <= factor <= upper, (
-                f"Wind calibration factor {factor:.2f} of {carrier} in {area} is outside "
-                f"the bounds [{lower}, {upper}]. Add {carrier} of {area} to backcast: "
-                "wind_calibration_exclude or widen backcast: "
-                "wind_calibration_factor_bounds."
+
+
+def calibrate_solar(
+    n: pypsa.Network,
+    generation: pd.DataFrame,
+    area_to_bus: pd.Series,
+    exclude: list[str],
+    factor_bounds: list[float],
+    self_consumption: pd.Series,
+) -> None:
+    """
+    Scale the solar availability per area to the grid-fed solar generation.
+
+    The ENTSO-E actual solar generation is the output fed into the grid,
+    the basis of the ENTSO-E load. Only the months with actual solar
+    generation are compared, and all solar generators of an area get one
+    factor for all snapshots, ``p_max_pu`` is clipped at 1. Areas that
+    publish generation, but none of solar, get zero solar availability.
+    Areas in `exclude` and areas without published generation are not
+    calibrated. Instead, the self-consumed share of their country in
+    `self_consumption` is removed from their availability, so that their
+    solar is grid-fed as well. Countries without a share keep their
+    availability. Factors outside `factor_bounds` raise an error.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Network with time-varying ``p_max_pu`` of the solar generators.
+    generation : pd.DataFrame
+        Monthly generation in MWh and hours with data indexed by area, carrier and month.
+    area_to_bus : pd.Series
+        ENTSO-E area per bus.
+    exclude : list[str]
+        ENTSO-E areas whose solar availability is not calibrated.
+    factor_bounds : list[float]
+        Lower and upper bound of the calibration factors.
+    self_consumption : pd.Series
+        Self-consumed share of the solar generation per country.
+    """
+    assert_known_areas(exclude, area_to_bus, "the solar calibration")
+    invalid = self_consumption[~self_consumption.between(0, 1, inclusive="left")]
+    assert invalid.empty, (
+        f"Solar self-consumption shares outside [0, 1): {invalid.to_dict()}"
+    )
+    g = n.generators
+    solar = g.index[g.carrier.isin(SOLAR_CARRIERS)]
+    assert_mapped(g.loc[solar], area_to_bus)
+    assert_time_varying(n, solar, "solar")
+    areas = g.bus[solar].map(area_to_bus)
+    countries = g.bus[solar].map(n.buses.country)
+    published = generation.index.unique("area")
+    energy = area_energy(n, generation, ["solar"])
+    calibrated = energy.index.unique("area")
+    months = snapshot_months(n)
+    for area, gens in solar.groupby(areas).items():
+        if area in exclude or area not in published:
+            remove_self_consumption(n, gens, area, countries[gens], self_consumption)
+        elif area in calibrated:
+            actual = energy[area]["solar"]
+            mask = months.isin(actual.index)
+            scale_availability(
+                n, gens, mask, actual.sum(), factor_bounds, "solar", area
             )
-            p_max_pu[gens] = (p_max_pu[gens] * factor).clip(upper=1)
-            check_clipping(
-                f"Calibrated {carrier} in {area} over {mask.sum()} snapshots "
-                f"from {before / 1e6:.2f} TWh (x{factor:.2f})",
-                target,
-                available(p_max_pu[gens], mask),
+        else:
+            n.generators_t.p_max_pu[gens] = 0.0
+            logger.warning(
+                f"No actual solar generation published for {area}, setting the "
+                f"availability of its {g.p_nom[gens].sum():.0f} MW to zero."
             )
+
+
+def remove_self_consumption(
+    n: pypsa.Network,
+    gens: pd.Index,
+    area: str,
+    countries: pd.Series,
+    self_consumption: pd.Series,
+) -> None:
+    """Scale the ``p_max_pu`` of the solar `gens` of `area` by one minus the self-consumed share of their country."""
+    known = countries.isin(self_consumption.index)
+    if not known.any():
+        logger.info(
+            f"No solar self-consumption share for {area}, keeping its solar availability."
+        )
+        return
+    assert known.all(), (
+        f"Solar self-consumption share missing for some countries of {area}: "
+        f"{sorted(countries[~known].unique())}"
+    )
+    share = countries.map(self_consumption)
+    p_max_pu = n.generators_t.p_max_pu
+    p_max_pu[gens] = p_max_pu[gens] * (1 - share)
+    logger.info(
+        f"Removed the self-consumed solar share {share.mean():.2f} from the "
+        f"availability in {area}."
+    )
 
 
 def carrier_curtailment(
