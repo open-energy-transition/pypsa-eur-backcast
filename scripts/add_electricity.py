@@ -42,6 +42,7 @@ from scripts._helpers import (
     rename_techs,
     update_p_nom_max,
 )
+from scripts.build_hydro_profile import balance_inflow
 from scripts.lib.conventional import cap_fuel_price, step_fuel_price
 
 if PYPSA_V1:
@@ -841,27 +842,31 @@ def attach_hydro(
 
     inflow_idx = ror.index.union(hydro.index)
     inflow_t = pd.DataFrame()
+    e_nom = pd.Series(dtype=float)
     if not inflow_idx.empty:
         dist_key = ppl.loc[inflow_idx, "p_nom"].groupby(country).transform(normed)
 
-        with xr.open_dataarray(profile_hydro) as inflow:
-            inflow_countries = pd.Index(country[inflow_idx])
-            missing_c = inflow_countries.unique().difference(
-                inflow.indexes["countries"]
-            )
-            assert missing_c.empty, (
-                f"'{profile_hydro}' is missing "
-                f"inflow time-series for at least one country: {', '.join(missing_c)}"
-            )
+        profile = xr.load_dataset(profile_hydro)
+        inflow = profile["inflow"]
+        inflow_countries = pd.Index(country[inflow_idx])
+        missing_c = inflow_countries.unique().difference(inflow.indexes["countries"])
+        assert missing_c.empty, (
+            f"'{profile_hydro}' is missing "
+            f"inflow time-series for at least one country: {', '.join(missing_c)}"
+        )
 
-            inflow_t = (
-                inflow.sel(countries=inflow_countries)
-                .rename({"countries": "name"})
-                .assign_coords(name=inflow_idx)
-                .transpose("time", "name")
-                .to_pandas()
-                .multiply(dist_key, axis=1)
-            )
+        inflow_t = (
+            inflow.sel(countries=inflow_countries)
+            .rename({"countries": "name"})
+            .assign_coords(name=inflow_idx)
+            .transpose("time", "name")
+            .to_pandas()
+            .multiply(dist_key, axis=1)
+        )
+
+        if params["inflow_source"] == "entsoe_balance":
+            balance_t, e_nom = balance_inflow(ppl.loc[inflow_idx], profile)
+            inflow_t[balance_t.columns] = balance_t
 
     if "ror" in carriers and not ror.empty:
         n.add(
@@ -945,6 +950,9 @@ def attach_hydro(
             (hydro.max_hours > 0) & ~hydro.index.isin(missing_mh_single_i),
             hydro.country.map(max_hours_country),
         ).fillna(6)
+        hydro_max_hours = (e_nom / hydro.p_nom).dropna().combine_first(hydro_max_hours)
+        efficiency_dispatch = pd.Series(costs.at["hydro", "efficiency"], hydro.index)
+        efficiency_dispatch[efficiency_dispatch.index.isin(e_nom.index)] = 1.0
 
         if params.get("flatten_dispatch", False):
             buffer = params.get("flatten_dispatch_buffer", 0.2)
@@ -964,7 +972,7 @@ def attach_hydro(
             marginal_cost=costs.at["hydro", "marginal_cost"],
             p_max_pu=p_max_pu,  # dispatch
             p_min_pu=0.0,  # store
-            efficiency_dispatch=costs.at["hydro", "efficiency"],
+            efficiency_dispatch=efficiency_dispatch,
             efficiency_store=0.0,
             cyclic_state_of_charge=True,
             inflow=inflow_t.loc[:, hydro.index],

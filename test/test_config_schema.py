@@ -269,3 +269,18 @@ def test_ntc_requires_fixed_transmission_limit(transmission_limit, valid):
     else:
         with pytest.raises(ValueError, match="fixed transmission network"):
             validate_config(config)
+
+
+@pytest.mark.parametrize("foresight", ["myopic", "perfect"])
+@pytest.mark.parametrize(
+    "backcast",
+    [
+        {"nuclear_min_output": True},
+        {"energy_budget_carriers": ["biomass"]},
+        {"external_flows": {"enable": True}},
+    ],
+)
+def test_backcast_observed_year_requires_overnight_foresight(foresight, backcast):
+    validate_config({"backcast": backcast})
+    with pytest.raises(ValueError, match="require foresight: overnight"):
+        validate_config({"foresight": foresight, "backcast": backcast})

@@ -116,7 +116,8 @@ if __name__ == "__main__":
                 dfs.append(align_basis(profile, Path(fn).stem, sns))
 
         if snakemake.input.hydro_profile:
-            inflow = xr.open_dataarray(snakemake.input.hydro_profile).to_pandas()
+            hydro = xr.open_dataset(snakemake.input.hydro_profile)
+            inflow = hydro["inflow"].to_pandas()
             dfs.append(align_basis(inflow, "inflow", sns))
 
         demand = xr.open_dataarray(snakemake.input.electricity_demand).to_pandas()

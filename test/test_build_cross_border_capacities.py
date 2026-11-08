@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: MIT
 """Tests for build_cross_border_capacities.py and the cross-border link replacement in scripts/lib/cross_border.py."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pandas as pd
 import pypsa
@@ -14,8 +16,11 @@ from scripts.build_cross_border_capacities import (
     build_capacities,
     scheduled_exchanges,
 )
+from scripts.compose_network import apply_external_flows
 from scripts.lib.cross_border import (
+    add_external_flows,
     apply_cross_border_capacities,
+    external_net_imports,
     inter_zone_branches,
     raise_to_physical,
 )
@@ -450,3 +455,111 @@ def test_scheduled_exchanges(exchange, expected):
     assert result.columns.tolist() == ["DE_LU->FR", "FR->DE_LU"]
     np.testing.assert_array_equal(result["DE_LU->FR"], [*expected, np.nan])
     np.testing.assert_array_equal(result["FR->DE_LU"], [0.0, 0, 0, 0, np.nan])
+
+
+EXTERNAL_BORDERS = pd.DataFrame(
+    {
+        "area": ["DE_LU", "FR"],
+        "external_area": ["RU", "UA"],
+        "flow": ["scheduled", "physical"],
+    }
+)
+
+
+def external(area_from: str, area_to: str, total: list[float]) -> pd.DataFrame:
+    return retrieved(area_from, area_to).assign(
+        scheduled_exchange_total=total, physical_flow=[5.0] * 4
+    )
+
+
+@pytest.mark.parametrize(
+    "directions, net, warned",
+    [
+        (
+            {
+                ("RU", "DE_LU"): [100.0, 0, 50, np.nan],
+                ("DE_LU", "RU"): [0.0, 30, 0, np.nan],
+            },
+            [100.0, -30, 50, 0],
+            True,
+        ),
+        ({("RU", "DE_LU"): [1.0, 2, 3, 4]}, [1.0, 2, 3, 4], False),
+        ({("DE_LU", "RU"): [1.0, np.nan, 3, 4]}, [-1.0, 0, -3, -4], True),
+    ],
+)
+def test_external_net_imports(directions, net, warned, caplog):
+    data = pd.concat(
+        [external("FR", "UA", [np.nan] * 4)]
+        + [external(*d, values) for d, values in directions.items()]
+    )
+    result = external_net_imports(
+        data, EXTERNAL_BORDERS, SNAPSHOTS, "scheduled_exchange_total"
+    )
+
+    assert result.columns.tolist() == ["RU->DE_LU", "UA->FR"]
+    np.testing.assert_array_equal(result["RU->DE_LU"], net)
+    np.testing.assert_array_equal(result["UA->FR"], [-5.0] * 4)
+    assert ("RU->DE_LU" in caplog.text) == warned
+
+
+@pytest.mark.parametrize(
+    "data, match",
+    [
+        (retrieved("RU", "DE_LU"), "scheduled_exchange_total"),
+        (external("FR", "UA", [1.0] * 4), "RU->DE_LU"),
+    ],
+)
+def test_external_net_imports_fails(data, match):
+    with pytest.raises(AssertionError, match=match):
+        external_net_imports(
+            data, EXTERNAL_BORDERS, SNAPSHOTS, "scheduled_exchange_total"
+        )
+
+
+def test_apply_external_flows_fails_on_unknown_area(tmp_path):
+    borders = tmp_path / "borders.csv"
+    EXTERNAL_BORDERS.to_csv(borders, index=False)
+    inputs = SimpleNamespace(external_borders=borders)
+    with pytest.raises(AssertionError, match="MA"):
+        apply_external_flows(
+            pypsa.Network(),
+            inputs,
+            AREA_TO_BUS,
+            ["UA", "MA"],
+            "scheduled_exchange_total",
+        )
+
+
+def test_add_external_flows(network):
+    network.add(
+        "Load",
+        ["DE00", "LUG1", "FR00"],
+        bus=["DE00", "LUG1", "FR00"],
+        p_set=pd.DataFrame({"DE00": 10.0, "LUG1": 1.0, "FR00": 5.0}, index=SNAPSHOTS),
+    )
+    net_imports = pd.DataFrame(
+        {"RU->DE_LU": [100.0, -30, 50, 0], "UA->FR": [-5.0] * 4}, index=SNAPSHOTS
+    )
+
+    add_external_flows(network, net_imports, EXTERNAL_BORDERS, AREA_TO_BUS)
+
+    imported = network.get_switchable_as_dense("Generator", "p_max_pu").mul(
+        network.generators.p_nom
+    )
+    p_min_pu = network.get_switchable_as_dense("Generator", "p_min_pu")
+    exported = network.loads_t.p_set[["RU->DE_LU export", "UA->FR export"]]
+    assert network.generators.bus.to_dict() == {"RU->DE_LU import": "DE00"}
+    assert network.loads.loc[exported.columns, "bus"].tolist() == ["DE00", "FR00"]
+    pd.testing.assert_frame_equal(
+        p_min_pu, network.get_switchable_as_dense("Generator", "p_max_pu")
+    )
+    np.testing.assert_allclose(
+        imported.sum(axis=1) - exported.sum(axis=1), net_imports.sum(axis=1)
+    )
+
+
+def test_add_external_flows_fails_on_modelled_area(network):
+    borders = pd.DataFrame({"area": ["DE_LU"], "external_area": ["FR"]})
+    net_imports = pd.DataFrame({"FR->DE_LU": [1.0] * 4}, index=SNAPSHOTS)
+    with pytest.raises(AssertionError, match="FR"):
+        add_external_flows(network, net_imports, borders, AREA_TO_BUS)

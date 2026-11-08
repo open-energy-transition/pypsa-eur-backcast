@@ -538,6 +538,33 @@
           "description": "Wind energy in TWh per carrier over all snapshots for ENTSO-E areas without published actual generation (`exclude_generation_areas`), to which `calibrate_wind` scales their availability instead of the ENTSO-E data, e.g. `GB: {onwind: 32.5, offwind: 49.6}` from DESNZ Energy Trends for 2023. Not allowed for areas with published generation or carriers in `wind_calibration_exclude`.",
           "type": "object"
         },
+        "calibrate_solar": {
+          "default": false,
+          "description": "Scale the solar availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual solar generation reported by the ENTSO-E Transparency Platform, i.e. the grid-fed output on the same basis as the ENTSO-E load. Only months with actual solar generation are compared. One factor per area, `p_max_pu` is clipped at 1. Areas that publish generation but no solar get zero solar availability. Areas in `solar_calibration_exclude` and in `exclude_generation_areas` are not calibrated; the self-consumed share of their country in `data/solar_self_consumption.csv` is removed from their availability instead, countries without a share keep it. With `solar_unpublished`, calibrated areas add the solar generation that ENTSO-E does not publish to their target. Requires `foresight: overnight`.",
+          "type": "boolean"
+        },
+        "solar_unpublished": {
+          "default": false,
+          "description": "Add the grid-fed solar generation in TWh that ENTSO-E does not publish but that serves the ENTSO-E load, per area from `data/solar_unpublished.csv` for the snapshot year, to the targets of `calibrate_solar`. The file must have rows for the snapshot year. Requires `calibrate_solar`.",
+          "type": "boolean"
+        },
+        "solar_calibration_exclude": {
+          "description": "ENTSO-E areas whose solar availability is not calibrated with `calibrate_solar` because ENTSO-E reports only part of their solar generation, e.g. `NL`. Their self-consumed share is removed from the availability instead.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "solar_calibration_factor_bounds": {
+          "description": "Lower and upper bound of the solar calibration factors of `calibrate_solar`. A factor outside the bounds raises an error naming the area, which must then be added to `solar_calibration_exclude` or the bounds widened.",
+          "items": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
         "monthly_nuclear_availability": {
           "default": false,
           "description": "Set the nuclear availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` and month to the actual monthly capacity factor, i.e. the actual generation divided by the hours with data and the nuclear capacity of the area, clipped to [0, 1]. After the last operating date in `nuclear_phase_out` the availability is zero. Every month before it must have actual generation, otherwise an error is raised. Areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
@@ -557,7 +584,7 @@
             },
             "type": "array"
           },
-          "description": "ENTSO-E areas per carrier of `monthly_availability_carriers` kept at their availability instead of the monthly capacity factor, e.g. `{coal: [PL]}` for a fleet used flexibly as a swing exporter, whose monthly mean capacity factor would wrongly flatten its hourly dispatch and distort the prices of its trading partners.",
+          "description": "ENTSO-E areas per carrier of `monthly_availability_carriers` or `energy_budget_carriers` kept at their availability instead of the monthly capacity factor or the energy budget, e.g. `{coal: [PL]}` for a fleet used flexibly as a swing exporter, whose monthly mean capacity factor would wrongly flatten its hourly dispatch and distort the prices of its trading partners.",
           "type": "object"
         },
         "nuclear_area_map": {
@@ -572,6 +599,55 @@
             "type": "string"
           },
           "description": "Last operating date of the nuclear generators per ENTSO-E area with `monthly_nuclear_availability`, after which their availability is zero, given as quoted ISO date, e.g. `DE_LU: \"2023-04-15\"` for the German nuclear exit.",
+          "type": "object"
+        },
+        "nuclear_min_output": {
+          "default": false,
+          "description": "Set the nuclear minimum output (`p_min_pu`) per ENTSO-E area and month to the lowest hourly actual generation of the month over the nuclear capacity of the area, clipped to [0, 1], and zero in months without actual generation. Areas without actual nuclear generation keep `conventional: nuclear: p_min_pu`, areas in `nuclear_load_following` get their share of the availability instead. Generators of the keys of `nuclear_area_map` are pooled with the area they map to.",
+          "type": "boolean"
+        },
+        "nuclear_load_following": {
+          "additionalProperties": {
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "type": "number"
+          },
+          "description": "Minimum output of the nuclear generators per ENTSO-E area as share of their availability (`p_max_pu`) with `nuclear_min_output`, for fleets that follow the load instead of running at their observed minimum, e.g. `FR: 0.2`.",
+          "type": "object"
+        },
+        "energy_budget_carriers": {
+          "description": "Generator carriers whose energy over the snapshots (`e_sum_max`) per ENTSO-E area is the actual generation of the area, scaled per month from the hours with data to all hours (every month needs data), raised to the Eurostat value for carriers in `energy_budget_eurostat`, shared by `p_nom` and raised to the must-run energy of `p_min_pu`. With `energy_budget_monthly_ceiling`, their availability (`p_max_pu`) is clipped to the peak hourly actual generation of the month over the capacity of the area. Carriers in `energy_budget_fixed` follow the hourly actual generation instead. Areas in `monthly_availability_exclude` of the carrier and areas without actual generation of the carrier keep their limits. Requires `foresight: overnight`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "energy_budget_monthly_ceiling": {
+          "default": true,
+          "description": "Clip the availability (`p_max_pu`) of the `energy_budget_carriers` per ENTSO-E area to the peak hourly actual generation of the month over the capacity of the area. Carriers in `energy_budget_fixed` are not clipped.",
+          "type": "boolean"
+        },
+        "energy_budget_eurostat": {
+          "description": "Carriers of `energy_budget_carriers` whose energy per ENTSO-E area is the larger of the actual generation and the Eurostat `nrg_bal_peh` gross electricity production of all producers including autoproducers in the snapshot year (biomass: bioenergy `BIOE` minus renewable municipal waste `W6210`), shared by `p_nom` over the generators of the carrier in each country. ENTSO-E misses most autoproducer output, e.g. FI pulp mills.",
+          "items": {
+            "const": "biomass",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "energy_budget_fixed": {
+          "description": "Carriers of `energy_budget_carriers` whose output per ENTSO-E area is fixed (`p_min_pu` = `p_max_pu`) to the hourly actual generation instead of capped by `e_sum_max`, for price-taking heat-led fleets such as biomass CHP whose binding annual cap would set the price. The hourly actual generation is scaled by the energy of the area over the actual energy (the Eurostat uplift of `energy_budget_eurostat`, else 1), shared by `p_nom` and capped at the capacity of the area. Hours without actual generation keep their limits.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fuel_price": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "description": "Fuel cost in EUR/MWh_th per technology replacing the cost data, e.g. `biomass: 30.68`. With `conventional: dynamic_fuel_price`, it applies to the carriers without monthly fuel prices.",
           "type": "object"
         },
         "exclude_generation_areas": {
@@ -709,6 +785,32 @@
                 "type": "string"
               },
               "type": "array"
+            }
+          }
+        },
+        "external_flows": {
+          "description": "Configuration for `backcast.external_flows` settings.",
+          "properties": {
+            "enable": {
+              "default": false,
+              "description": "Add the hourly ENTSO-E exchanges with the `areas` outside the model as fixed flows at the bus with the largest load of the bordering modelled area: net imports as a generator with `p_min_pu` equal to `p_max_pu`, net exports as a load. The borders are listed in `data/entsoe_external_borders.csv`, whose `flow` column selects scheduled exchanges (`source`) or physical flows per border with a cited reason. Hours without published exchanges count as zero and are logged as a warning per border, a border without any published value in the year raises. Areas modelled as buses raise an error, e.g. `GB`.",
+              "type": "boolean"
+            },
+            "areas": {
+              "description": "ENTSO-E areas outside the model whose exchanges are fixed. `UA` returns the exchanges of the Burshtyn island (`UA_BEI`) and of `UA_DOBTPP` before the synchronisation of Ukraine in 2022. Morocco (ES-MA) is not included: the ENTSO-E Transparency Platform returns no scheduled exchanges or physical flows for `10YMA-ONE------O` or the border area `10YDOM-1010A0140` (probed 2019-06, 2021-06, 2023-06). EE-RU is not included: no scheduled exchanges are published, as Baltic trade with Russia and Belarus is scheduled on the LT borders, and its physical flows are loop flows of the synchronous BRELL ring (EE>RU 158 GWh in 2023-06 without trade).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "source": {
+              "default": "scheduled_exchange_total",
+              "description": "ENTSO-E scheduled commercial exchanges used: day-ahead (`scheduled_exchange`) or total including explicit allocations and intraday (`scheduled_exchange_total`). Most external borders publish only the total, e.g. BG-TR, GR-TR and SK-UA. Borders with `flow` `physical` in `data/entsoe_external_borders.csv` use the physical flows instead, e.g. FI-RU, which publishes no scheduled exchanges.",
+              "enum": [
+                "scheduled_exchange",
+                "scheduled_exchange_total"
+              ],
+              "type": "string"
             }
           }
         }
@@ -2197,6 +2299,26 @@
             }
           }
         },
+        "entsoe_reservoir_filling": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
         "entsoe_cross_border_capacities": {
           "description": "Configuration for a single data source.",
           "properties": {
@@ -3340,6 +3462,32 @@
             ]
           },
           "type": "array"
+        }
+      }
+    },
+    "ExternalFlowsConfig": {
+      "description": "Configuration for `backcast.external_flows` settings.",
+      "properties": {
+        "enable": {
+          "default": false,
+          "description": "Add the hourly ENTSO-E exchanges with the `areas` outside the model as fixed flows at the bus with the largest load of the bordering modelled area: net imports as a generator with `p_min_pu` equal to `p_max_pu`, net exports as a load. The borders are listed in `data/entsoe_external_borders.csv`, whose `flow` column selects scheduled exchanges (`source`) or physical flows per border with a cited reason. Hours without published exchanges count as zero and are logged as a warning per border, a border without any published value in the year raises. Areas modelled as buses raise an error, e.g. `GB`.",
+          "type": "boolean"
+        },
+        "areas": {
+          "description": "ENTSO-E areas outside the model whose exchanges are fixed. `UA` returns the exchanges of the Burshtyn island (`UA_BEI`) and of `UA_DOBTPP` before the synchronisation of Ukraine in 2022. Morocco (ES-MA) is not included: the ENTSO-E Transparency Platform returns no scheduled exchanges or physical flows for `10YMA-ONE------O` or the border area `10YDOM-1010A0140` (probed 2019-06, 2021-06, 2023-06). EE-RU is not included: no scheduled exchanges are published, as Baltic trade with Russia and Belarus is scheduled on the LT borders, and its physical flows are loop flows of the synchronous BRELL ring (EE>RU 158 GWh in 2023-06 without trade).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source": {
+          "default": "scheduled_exchange_total",
+          "description": "ENTSO-E scheduled commercial exchanges used: day-ahead (`scheduled_exchange`) or total including explicit allocations and intraday (`scheduled_exchange_total`). Most external borders publish only the total, e.g. BG-TR, GR-TR and SK-UA. Borders with `flow` `physical` in `data/entsoe_external_borders.csv` use the physical flows instead, e.g. FI-RU, which publishes no scheduled exchanges.",
+          "enum": [
+            "scheduled_exchange",
+            "scheduled_exchange_total"
+          ],
+          "type": "string"
         }
       }
     },
@@ -5541,6 +5689,34 @@
               "default": false,
               "description": "Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
               "type": "boolean"
+            },
+            "inflow_source": {
+              "default": "eia",
+              "description": "Source of the run-of-river and reservoir inflow. 'eia' scales the runoff per country to the annual EIA hydro generation and splits it onto the plants by `p_nom`. 'entsoe_balance' takes the inflow per ENTSO-E bidding zone area in `backcast: area_to_bus` from the hourly actual generation of run-of-river and reservoir hydro plus the weekly change of the reservoir filling, sets the reservoir energy capacity to the maximum observed filling and the reservoir dispatch efficiency to 1. Areas without published generation keep the EIA based inflow.",
+              "enum": [
+                "eia",
+                "entsoe_balance"
+              ],
+              "type": "string"
+            },
+            "entsoe_balance": {
+              "description": "Configuration for the hydro inflow from the ENTSO-E water balance.",
+              "properties": {
+                "filling_first_year": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "description": "ENTSO-E areas that publish the weekly filling of water reservoirs and hydro storage plants (Transparency Platform 16.1.D) with the first year whose filling is retrieved. CH publishes filling too but is in `exclude_areas`. The maximum filling from this year to the last snapshot year is the reservoir energy capacity. Defaults: first published week 2014-12-28 to 2015-02-22 for all areas except RS, which publishes from 2016-12-11 (weekly filling retrieved for 2015 to 2024 in dev/day-ahead-backcast/phase3/data/reservoir_filling_2015_2024_weekly_MWh.csv).",
+                  "type": "object"
+                },
+                "exclude_areas": {
+                  "description": "ENTSO-E areas that keep the EIA based inflow because their published actual generation misses most of the hydro fleet: CH 13.1 TWh hydro and run-of-river in 2023 on the Transparency Platform against 37.0 TWh in `data/eia_hydro_annual_generation.csv`, XK 0.01 against 0.39 TWh.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
             }
           }
         }
@@ -9125,6 +9301,53 @@
           "default": false,
           "description": "Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
           "type": "boolean"
+        },
+        "inflow_source": {
+          "default": "eia",
+          "description": "Source of the run-of-river and reservoir inflow. 'eia' scales the runoff per country to the annual EIA hydro generation and splits it onto the plants by `p_nom`. 'entsoe_balance' takes the inflow per ENTSO-E bidding zone area in `backcast: area_to_bus` from the hourly actual generation of run-of-river and reservoir hydro plus the weekly change of the reservoir filling, sets the reservoir energy capacity to the maximum observed filling and the reservoir dispatch efficiency to 1. Areas without published generation keep the EIA based inflow.",
+          "enum": [
+            "eia",
+            "entsoe_balance"
+          ],
+          "type": "string"
+        },
+        "entsoe_balance": {
+          "description": "Configuration for the hydro inflow from the ENTSO-E water balance.",
+          "properties": {
+            "filling_first_year": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "description": "ENTSO-E areas that publish the weekly filling of water reservoirs and hydro storage plants (Transparency Platform 16.1.D) with the first year whose filling is retrieved. CH publishes filling too but is in `exclude_areas`. The maximum filling from this year to the last snapshot year is the reservoir energy capacity. Defaults: first published week 2014-12-28 to 2015-02-22 for all areas except RS, which publishes from 2016-12-11 (weekly filling retrieved for 2015 to 2024 in dev/day-ahead-backcast/phase3/data/reservoir_filling_2015_2024_weekly_MWh.csv).",
+              "type": "object"
+            },
+            "exclude_areas": {
+              "description": "ENTSO-E areas that keep the EIA based inflow because their published actual generation misses most of the hydro fleet: CH 13.1 TWh hydro and run-of-river in 2023 on the Transparency Platform against 37.0 TWh in `data/eia_hydro_annual_generation.csv`, XK 0.01 against 0.39 TWh.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        }
+      }
+    },
+    "_HydroEntsoeBalanceConfig": {
+      "description": "Configuration for the hydro inflow from the ENTSO-E water balance.",
+      "properties": {
+        "filling_first_year": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "ENTSO-E areas that publish the weekly filling of water reservoirs and hydro storage plants (Transparency Platform 16.1.D) with the first year whose filling is retrieved. CH publishes filling too but is in `exclude_areas`. The maximum filling from this year to the last snapshot year is the reservoir energy capacity. Defaults: first published week 2014-12-28 to 2015-02-22 for all areas except RS, which publishes from 2016-12-11 (weekly filling retrieved for 2015 to 2024 in dev/day-ahead-backcast/phase3/data/reservoir_filling_2015_2024_weekly_MWh.csv).",
+          "type": "object"
+        },
+        "exclude_areas": {
+          "description": "ENTSO-E areas that keep the EIA based inflow because their published actual generation misses most of the hydro fleet: CH 13.1 TWh hydro and run-of-river in 2023 on the Transparency Platform against 37.0 TWh in `data/eia_hydro_annual_generation.csv`, XK 0.01 against 0.39 TWh.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       }
     },
@@ -12742,6 +12965,34 @@
               "default": false,
               "description": "Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
               "type": "boolean"
+            },
+            "inflow_source": {
+              "default": "eia",
+              "description": "Source of the run-of-river and reservoir inflow. 'eia' scales the runoff per country to the annual EIA hydro generation and splits it onto the plants by `p_nom`. 'entsoe_balance' takes the inflow per ENTSO-E bidding zone area in `backcast: area_to_bus` from the hourly actual generation of run-of-river and reservoir hydro plus the weekly change of the reservoir filling, sets the reservoir energy capacity to the maximum observed filling and the reservoir dispatch efficiency to 1. Areas without published generation keep the EIA based inflow.",
+              "enum": [
+                "eia",
+                "entsoe_balance"
+              ],
+              "type": "string"
+            },
+            "entsoe_balance": {
+              "description": "Configuration for the hydro inflow from the ENTSO-E water balance.",
+              "properties": {
+                "filling_first_year": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "description": "ENTSO-E areas that publish the weekly filling of water reservoirs and hydro storage plants (Transparency Platform 16.1.D) with the first year whose filling is retrieved. CH publishes filling too but is in `exclude_areas`. The maximum filling from this year to the last snapshot year is the reservoir energy capacity. Defaults: first published week 2014-12-28 to 2015-02-22 for all areas except RS, which publishes from 2016-12-11 (weekly filling retrieved for 2015 to 2024 in dev/day-ahead-backcast/phase3/data/reservoir_filling_2015_2024_weekly_MWh.csv).",
+                  "type": "object"
+                },
+                "exclude_areas": {
+                  "description": "ENTSO-E areas that keep the EIA based inflow because their published actual generation misses most of the hydro fleet: CH 13.1 TWh hydro and run-of-river in 2023 on the Transparency Platform against 37.0 TWh in `data/eia_hydro_annual_generation.csv`, XK 0.01 against 0.39 TWh.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
             }
           }
         }
@@ -13421,6 +13672,33 @@
           "description": "Wind energy in TWh per carrier over all snapshots for ENTSO-E areas without published actual generation (`exclude_generation_areas`), to which `calibrate_wind` scales their availability instead of the ENTSO-E data, e.g. `GB: {onwind: 32.5, offwind: 49.6}` from DESNZ Energy Trends for 2023. Not allowed for areas with published generation or carriers in `wind_calibration_exclude`.",
           "type": "object"
         },
+        "calibrate_solar": {
+          "default": false,
+          "description": "Scale the solar availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual solar generation reported by the ENTSO-E Transparency Platform, i.e. the grid-fed output on the same basis as the ENTSO-E load. Only months with actual solar generation are compared. One factor per area, `p_max_pu` is clipped at 1. Areas that publish generation but no solar get zero solar availability. Areas in `solar_calibration_exclude` and in `exclude_generation_areas` are not calibrated; the self-consumed share of their country in `data/solar_self_consumption.csv` is removed from their availability instead, countries without a share keep it. With `solar_unpublished`, calibrated areas add the solar generation that ENTSO-E does not publish to their target. Requires `foresight: overnight`.",
+          "type": "boolean"
+        },
+        "solar_unpublished": {
+          "default": false,
+          "description": "Add the grid-fed solar generation in TWh that ENTSO-E does not publish but that serves the ENTSO-E load, per area from `data/solar_unpublished.csv` for the snapshot year, to the targets of `calibrate_solar`. The file must have rows for the snapshot year. Requires `calibrate_solar`.",
+          "type": "boolean"
+        },
+        "solar_calibration_exclude": {
+          "description": "ENTSO-E areas whose solar availability is not calibrated with `calibrate_solar` because ENTSO-E reports only part of their solar generation, e.g. `NL`. Their self-consumed share is removed from the availability instead.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "solar_calibration_factor_bounds": {
+          "description": "Lower and upper bound of the solar calibration factors of `calibrate_solar`. A factor outside the bounds raises an error naming the area, which must then be added to `solar_calibration_exclude` or the bounds widened.",
+          "items": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
         "monthly_nuclear_availability": {
           "default": false,
           "description": "Set the nuclear availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` and month to the actual monthly capacity factor, i.e. the actual generation divided by the hours with data and the nuclear capacity of the area, clipped to [0, 1]. After the last operating date in `nuclear_phase_out` the availability is zero. Every month before it must have actual generation, otherwise an error is raised. Areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
@@ -13440,7 +13718,7 @@
             },
             "type": "array"
           },
-          "description": "ENTSO-E areas per carrier of `monthly_availability_carriers` kept at their availability instead of the monthly capacity factor, e.g. `{coal: [PL]}` for a fleet used flexibly as a swing exporter, whose monthly mean capacity factor would wrongly flatten its hourly dispatch and distort the prices of its trading partners.",
+          "description": "ENTSO-E areas per carrier of `monthly_availability_carriers` or `energy_budget_carriers` kept at their availability instead of the monthly capacity factor or the energy budget, e.g. `{coal: [PL]}` for a fleet used flexibly as a swing exporter, whose monthly mean capacity factor would wrongly flatten its hourly dispatch and distort the prices of its trading partners.",
           "type": "object"
         },
         "nuclear_area_map": {
@@ -13455,6 +13733,55 @@
             "type": "string"
           },
           "description": "Last operating date of the nuclear generators per ENTSO-E area with `monthly_nuclear_availability`, after which their availability is zero, given as quoted ISO date, e.g. `DE_LU: \"2023-04-15\"` for the German nuclear exit.",
+          "type": "object"
+        },
+        "nuclear_min_output": {
+          "default": false,
+          "description": "Set the nuclear minimum output (`p_min_pu`) per ENTSO-E area and month to the lowest hourly actual generation of the month over the nuclear capacity of the area, clipped to [0, 1], and zero in months without actual generation. Areas without actual nuclear generation keep `conventional: nuclear: p_min_pu`, areas in `nuclear_load_following` get their share of the availability instead. Generators of the keys of `nuclear_area_map` are pooled with the area they map to.",
+          "type": "boolean"
+        },
+        "nuclear_load_following": {
+          "additionalProperties": {
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "type": "number"
+          },
+          "description": "Minimum output of the nuclear generators per ENTSO-E area as share of their availability (`p_max_pu`) with `nuclear_min_output`, for fleets that follow the load instead of running at their observed minimum, e.g. `FR: 0.2`.",
+          "type": "object"
+        },
+        "energy_budget_carriers": {
+          "description": "Generator carriers whose energy over the snapshots (`e_sum_max`) per ENTSO-E area is the actual generation of the area, scaled per month from the hours with data to all hours (every month needs data), raised to the Eurostat value for carriers in `energy_budget_eurostat`, shared by `p_nom` and raised to the must-run energy of `p_min_pu`. With `energy_budget_monthly_ceiling`, their availability (`p_max_pu`) is clipped to the peak hourly actual generation of the month over the capacity of the area. Carriers in `energy_budget_fixed` follow the hourly actual generation instead. Areas in `monthly_availability_exclude` of the carrier and areas without actual generation of the carrier keep their limits. Requires `foresight: overnight`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "energy_budget_monthly_ceiling": {
+          "default": true,
+          "description": "Clip the availability (`p_max_pu`) of the `energy_budget_carriers` per ENTSO-E area to the peak hourly actual generation of the month over the capacity of the area. Carriers in `energy_budget_fixed` are not clipped.",
+          "type": "boolean"
+        },
+        "energy_budget_eurostat": {
+          "description": "Carriers of `energy_budget_carriers` whose energy per ENTSO-E area is the larger of the actual generation and the Eurostat `nrg_bal_peh` gross electricity production of all producers including autoproducers in the snapshot year (biomass: bioenergy `BIOE` minus renewable municipal waste `W6210`), shared by `p_nom` over the generators of the carrier in each country. ENTSO-E misses most autoproducer output, e.g. FI pulp mills.",
+          "items": {
+            "const": "biomass",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "energy_budget_fixed": {
+          "description": "Carriers of `energy_budget_carriers` whose output per ENTSO-E area is fixed (`p_min_pu` = `p_max_pu`) to the hourly actual generation instead of capped by `e_sum_max`, for price-taking heat-led fleets such as biomass CHP whose binding annual cap would set the price. The hourly actual generation is scaled by the energy of the area over the actual energy (the Eurostat uplift of `energy_budget_eurostat`, else 1), shared by `p_nom` and capped at the capacity of the area. Hours without actual generation keep their limits.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fuel_price": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "description": "Fuel cost in EUR/MWh_th per technology replacing the cost data, e.g. `biomass: 30.68`. With `conventional: dynamic_fuel_price`, it applies to the carriers without monthly fuel prices.",
           "type": "object"
         },
         "exclude_generation_areas": {
@@ -13592,6 +13919,32 @@
                 "type": "string"
               },
               "type": "array"
+            }
+          }
+        },
+        "external_flows": {
+          "description": "Configuration for `backcast.external_flows` settings.",
+          "properties": {
+            "enable": {
+              "default": false,
+              "description": "Add the hourly ENTSO-E exchanges with the `areas` outside the model as fixed flows at the bus with the largest load of the bordering modelled area: net imports as a generator with `p_min_pu` equal to `p_max_pu`, net exports as a load. The borders are listed in `data/entsoe_external_borders.csv`, whose `flow` column selects scheduled exchanges (`source`) or physical flows per border with a cited reason. Hours without published exchanges count as zero and are logged as a warning per border, a border without any published value in the year raises. Areas modelled as buses raise an error, e.g. `GB`.",
+              "type": "boolean"
+            },
+            "areas": {
+              "description": "ENTSO-E areas outside the model whose exchanges are fixed. `UA` returns the exchanges of the Burshtyn island (`UA_BEI`) and of `UA_DOBTPP` before the synchronisation of Ukraine in 2022. Morocco (ES-MA) is not included: the ENTSO-E Transparency Platform returns no scheduled exchanges or physical flows for `10YMA-ONE------O` or the border area `10YDOM-1010A0140` (probed 2019-06, 2021-06, 2023-06). EE-RU is not included: no scheduled exchanges are published, as Baltic trade with Russia and Belarus is scheduled on the LT borders, and its physical flows are loop flows of the synchronous BRELL ring (EE>RU 158 GWh in 2023-06 without trade).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "source": {
+              "default": "scheduled_exchange_total",
+              "description": "ENTSO-E scheduled commercial exchanges used: day-ahead (`scheduled_exchange`) or total including explicit allocations and intraday (`scheduled_exchange_total`). Most external borders publish only the total, e.g. BG-TR, GR-TR and SK-UA. Borders with `flow` `physical` in `data/entsoe_external_borders.csv` use the physical flows instead, e.g. FI-RU, which publishes no scheduled exchanges.",
+              "enum": [
+                "scheduled_exchange",
+                "scheduled_exchange_total"
+              ],
+              "type": "string"
             }
           }
         }
@@ -16708,6 +17061,26 @@
           }
         },
         "entsoe_unavailability": {
+          "description": "Configuration for a single data source.",
+          "properties": {
+            "source": {
+              "default": "archive",
+              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
+              "enum": [
+                "archive",
+                "primary",
+                "build"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "default": "latest",
+              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
+              "type": "string"
+            }
+          }
+        },
+        "entsoe_reservoir_filling": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {

@@ -1,0 +1,12 @@
+area,external_area,flow,source
+BG,TR,scheduled,entsoe-py 0.8.1 NEIGHBOURS; ENTSO-E Transparency Platform total scheduled commercial exchanges (12.1.F)
+FI,RU,physical,entsoe-py 0.8.1 NEIGHBOURS; DC back-to-back Vyborg without published scheduled exchanges (12.1.F documents A01 and A05 empty in 2019-06 and 2021-06); physical flows (12.1.G) RU>FI 458 GWh in 2019-06 equal the trade across the asynchronous link
+GR,TR,scheduled,entsoe-py 0.8.1 NEIGHBOURS; ENTSO-E Transparency Platform total scheduled commercial exchanges (12.1.F)
+HU,UA,scheduled,entsoe-py 0.8.1 NEIGHBOURS; ENTSO-E Transparency Platform total scheduled commercial exchanges (12.1.F); UA>HU 261 GWh in 2019-06 and 0 in 2023-06 while physical flows (12.1.G) carry 115 GWh loop flows
+LT,BY,scheduled,entsoe-py 0.8.1 NEIGHBOURS; ENTSO-E Transparency Platform total scheduled commercial exchanges (12.1.F); Baltic trade with Russia and Belarus is scheduled on the LT borders
+LT,RU_KGD,scheduled,entsoe-py 0.8.1 NEIGHBOURS; ENTSO-E Transparency Platform total scheduled commercial exchanges (12.1.F)
+LV,RU,scheduled,entsoe-py 0.8.1 NEIGHBOURS; ENTSO-E Transparency Platform total scheduled commercial exchanges (12.1.F)
+PL,UA,scheduled,entsoe-py 0.8.1 NEIGHBOURS; ENTSO-E Transparency Platform total scheduled commercial exchanges (12.1.F)
+RO,MD,scheduled,ENTSO-E Transparency Platform total scheduled commercial exchanges RO>MD (12.1.F)
+RO,UA,scheduled,entsoe-py 0.8.1 NEIGHBOURS; ENTSO-E Transparency Platform total scheduled commercial exchanges (12.1.F)
+SK,UA,scheduled,entsoe-py 0.8.1 NEIGHBOURS; ENTSO-E Transparency Platform total scheduled commercial exchanges (12.1.F)

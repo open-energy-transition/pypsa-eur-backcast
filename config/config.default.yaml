@@ -418,6 +418,31 @@ renewable:
     eia_norm_year: false
     eia_correct_by_capacity: false
     eia_approximate_missing: false
+    inflow_source: eia
+    entsoe_balance:
+      filling_first_year:
+        NO_1: 2015
+        NO_2: 2015
+        NO_3: 2015
+        NO_4: 2015
+        NO_5: 2015
+        SE_1: 2015
+        SE_2: 2015
+        SE_3: 2015
+        SE_4: 2015
+        FI: 2015
+        ES: 2015
+        PT: 2015
+        AT: 2015
+        IT: 2015
+        FR: 2015
+        BG: 2015
+        RO: 2015
+        HR: 2015
+        RS: 2017
+      exclude_areas:
+      - CH
+      - XK
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration/#conventional_cf
 conventional:
@@ -580,11 +605,24 @@ backcast:
   - 2.0
   wind_curtailment_twh: {}
   wind_target_twh: {}
+  calibrate_solar: false
+  solar_unpublished: false
+  solar_calibration_exclude: []
+  solar_calibration_factor_bounds:
+  - 0.5
+  - 2.0
   monthly_nuclear_availability: false
   monthly_availability_carriers: []
   monthly_availability_exclude: {}
   nuclear_area_map: {}
   nuclear_phase_out: {}
+  nuclear_min_output: false
+  nuclear_load_following: {}
+  energy_budget_carriers: []
+  energy_budget_monthly_ceiling: true
+  energy_budget_eurostat: []
+  energy_budget_fixed: []
+  fuel_price: {}
   exclude_generation_areas: []
   hybrid_capacities:
     enable: false
@@ -630,6 +668,16 @@ backcast:
     replace_p_min_pu:
     - biomass
     - waste
+  external_flows:
+    enable: false
+    areas:
+    - UA
+    - MD
+    - TR
+    - RU
+    - RU_KGD
+    - BY
+    source: scheduled_exchange_total
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration/#pypsa_eur_cf
 pypsa_eur:
@@ -1601,6 +1649,9 @@ data:
     source: build
     version: latest
   entsoe_unavailability:
+    source: build
+    version: latest
+  entsoe_reservoir_filling:
     source: build
     version: latest
   entsoe_cross_border_capacities:

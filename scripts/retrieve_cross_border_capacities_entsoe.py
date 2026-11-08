@@ -7,7 +7,11 @@ Retrieves the day-ahead cross-border capacity data of one bidding zone border, d
 Three series are queried through the ENTSO-E API for the calendar year in UTC
 in monthly chunks: the day-ahead offered capacity of implicit allocations
 (``offered_capacity``), the day-ahead net transfer capacity (``ntc``) and the
-day-ahead scheduled commercial exchanges (``scheduled_exchange``). Capacities
+day-ahead scheduled commercial exchanges (``scheduled_exchange``). Borders
+with an area of ``backcast: external_flows: areas`` also get the total
+scheduled commercial exchanges (``scheduled_exchange_total``), as most borders
+to areas outside the model publish no day-ahead exchanges, and the physical
+flows (``physical_flow``), as FI-RU publishes no scheduled exchanges. Capacities
 are not published for borders within the flow-based Core region, for which the
 build step uses the scheduled exchanges as proxy. Months without published
 data are stored as missing values. All series are stored in their native
@@ -77,6 +81,15 @@ if __name__ == "__main__":
             area_from, area_to, start=s, end=e, dayahead=True
         ),
     }
+    if {area_from, area_to} & set(snakemake.params.external_areas):
+        queries["scheduled_exchange_total"] = lambda s, e: (
+            client.query_scheduled_exchanges(
+                area_from, area_to, start=s, end=e, dayahead=False
+            )
+        )
+        queries["physical_flow"] = lambda s, e: client.query_crossborder_flows(
+            area_from, area_to, start=s, end=e
+        )
     data = pd.concat(
         [query_monthly(q, start, end, name) for name, q in queries.items()], axis=1
     )

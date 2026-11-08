@@ -508,6 +508,23 @@ def input_day_ahead_prices(w) -> list[str]:
     )
 
 
+def input_external_exchanges(w) -> list[str]:
+    external = config_provider("backcast", "external_flows")(w)
+    if not external["enable"]:
+        return []
+    borders = pd.read_csv("data/entsoe_external_borders.csv")
+    borders = borders[
+        borders.area.isin(modelled_entsoe_areas(w))
+        & borders.external_area.isin(external["areas"])
+    ]
+    return [
+        f"{ENTSOE_CAPACITIES_DATA['folder']}/cross_border_capacities_{year}_{a}-{b}.csv"
+        for year in snapshot_years(w)
+        for area, ext in zip(borders.area, borders.external_area)
+        for a, b in [(area, ext), (ext, area)]
+    ]
+
+
 def input_cross_border_capacities(w) -> list[str]:
     areas = modelled_entsoe_areas(w)
     fixed = config_provider("backcast", "fixed_border_capacities")(w)
@@ -712,9 +729,31 @@ if COUNTRY_RUNOFF_DATASET["source"] == "build":
             scripts("build_country_runoff.py")
 
 
+def input_hydro_balance(w) -> dict[str, str | list[str]]:
+    hydro = config_provider("renewable", "hydro")(w)
+    if hydro["inflow_source"] != "entsoe_balance":
+        return {}
+    countries = config_provider("countries")(w)
+    last_year = max(snapshot_years(w))
+    filling = {
+        f"filling_{area}": expand(
+            f"{ENTSOE_FILLING_DATA['folder']}/reservoir_filling_{area}_{{year}}.csv",
+            year=range(first_year, last_year + 1),
+        )
+        for area, first_year in hydro["entsoe_balance"]["filling_first_year"].items()
+        if area[:2] in countries
+    }
+    return dict(
+        entsoe_generation=resources("entsoe_generation_hourly.csv"),
+        area_to_bus=config_provider("backcast", "area_to_bus")(w),
+        **filling,
+    )
+
+
 rule build_hydro_profile:
-    """Builds hydro inflow time series per country from runoff scaled to EIA generation statistics."""
+    """Builds hydro inflow time series per country from runoff scaled to EIA generation statistics, optionally with the ENTSO-E water balance per bidding zone."""
     input:
+        unpack(input_hydro_balance),
         country_shapes=resources("country_shapes.geojson"),
         eia_hydro_generation="data/eia_hydro_annual_generation.csv",
         eia_hydro_capacity="data/eia_hydro_annual_capacity.csv",

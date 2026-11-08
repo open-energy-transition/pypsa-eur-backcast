@@ -146,3 +146,108 @@ def apply_cross_border_capacities(
         length=borders.length.values,
         underwater_fraction=borders.underwater_fraction.values,
     )
+
+
+def external_net_imports(
+    data: pd.DataFrame,
+    borders: pd.DataFrame,
+    snapshots: pd.DatetimeIndex,
+    source: str,
+) -> pd.DataFrame:
+    """
+    Return the hourly net import in MW from the external area into the modelled area of each border.
+
+    The columns are named ``<external_area>-><area>``. Borders with ``flow``
+    ``scheduled`` use the scheduled exchanges `source`, borders with ``flow``
+    ``physical`` the physical flows. A direction without a value in an hour
+    counts as zero, hours in which neither direction has a value are logged
+    as a warning per border, and a border without any value raises.
+    """
+    assert set(borders.flow) <= {"scheduled", "physical"}, (
+        f"Unknown `flow` in external borders: {sorted(set(borders.flow))}"
+    )
+    series = borders.flow.map({"scheduled": source, "physical": "physical_flow"})
+    absent = sorted(set(series) - set(data.columns))
+    assert not absent, (
+        f"Retrieved cross-border data lacks {absent}, retrieve it again with the "
+        "area in `backcast: external_flows: areas`."
+    )
+    hourly = {
+        column: data[column]
+        .astype(float)
+        .unstack(["area_from", "area_to"])
+        .resample("h")
+        .mean()
+        .reindex(snapshots)
+        for column in set(series)
+    }
+    nan = pd.Series(np.nan, snapshots)
+    net = {}
+    missing = {}
+    for column, area, external in zip(series, borders.area, borders.external_area):
+        name = border_name(external, area)
+        imports = hourly[column].get((external, area), nan)
+        exports = hourly[column].get((area, external), nan)
+        missing[name] = int((imports.isna() & exports.isna()).sum())
+        net[name] = imports.fillna(0.0) - exports.fillna(0.0)
+    missing = pd.Series(missing, dtype=int)
+    empty = missing.index[missing == len(snapshots)].tolist()
+    assert not empty, (
+        f"No published exchanges in any snapshot for external borders {empty}."
+    )
+    if missing.any():
+        logger.warning(
+            f"Hours without published exchanges per external border, counted as zero:\n{missing[missing > 0].to_string()}"
+        )
+    return pd.DataFrame(net, index=snapshots)
+
+
+def add_external_flows(
+    n: pypsa.Network,
+    net_imports: pd.DataFrame,
+    borders: pd.DataFrame,
+    area_to_bus: pd.Series,
+) -> None:
+    """
+    Add fixed hourly flows to areas outside the model at the bus of the modelled area with the largest load.
+
+    Net imports become a generator with ``p_min_pu`` equal to ``p_max_pu``
+    (carrier ``external import``), net exports a load (carrier ``external
+    export``), each named ``<external_area>-><area> import|export``.
+    """
+    modelled = area_to_bus[area_to_bus.index.isin(n.buses.index)]
+    overlap = sorted(set(borders.external_area) & set(modelled))
+    assert not overlap, (
+        f"External areas are modelled as buses, remove them from `backcast: external_flows: areas`: {overlap}"
+    )
+    load = n.loads_t.p_set.sum().groupby(n.loads.bus).sum().reindex(modelled.index)
+    main_bus = load.fillna(0.0).groupby(modelled).idxmax()
+    bus = borders.area.map(main_bus).set_axis(net_imports.columns)
+    assert bus.notna().all(), (
+        f"Border areas without bus: {bus[bus.isna()].index.tolist()}"
+    )
+    imports = net_imports.clip(lower=0.0).loc[:, lambda df: df.max() > 0]
+    exports = (-net_imports).clip(lower=0.0).loc[:, lambda df: df.max() > 0]
+    p_nom = imports.max()
+    p_pu = imports.div(p_nom).add_suffix(" import")
+    n.add(
+        "Generator",
+        p_pu.columns,
+        bus=bus[imports.columns].values,
+        carrier="external import",
+        p_nom=p_nom.values,
+        p_max_pu=p_pu,
+        p_min_pu=p_pu,
+        marginal_cost=0.0,
+    )
+    n.add(
+        "Load",
+        exports.columns + " export",
+        bus=bus[exports.columns].values,
+        carrier="external export",
+        p_set=exports.add_suffix(" export"),
+    )
+    net = net_imports.mul(n.snapshot_weightings.generators, axis=0).sum().div(1e6)
+    logger.info(
+        f"Fixed net imports from external areas in TWh:\n{net.round(2).to_string()}"
+    )
