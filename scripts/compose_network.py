@@ -46,6 +46,7 @@ from scripts.lib.backcast_calibration import (
     calibrate_solar,
     calibrate_wind,
     read_generation,
+    read_solar_unpublished,
 )
 from scripts.lib.conventional import (
     apply_chp_floor,
@@ -66,6 +67,7 @@ from scripts.lib.entsoe import (
     read_area_to_bus,
     read_hourly_generation,
 )
+from scripts.lib.eurostat import eurostat_year, gross_electricity
 from scripts.lib.unavailability import apply_unavailability
 from scripts.prepare_network import (
     apply_co2_budget_constraints,
@@ -138,6 +140,13 @@ def apply_backcast(
             backcast["solar_calibration_exclude"],
             backcast["solar_calibration_factor_bounds"],
             pd.read_csv(inputs.solar_self_consumption, index_col="country").share,
+            (
+                read_solar_unpublished(
+                    inputs.solar_unpublished, eurostat_year(n.snapshots, None)
+                )
+                if backcast["solar_unpublished"]
+                else pd.Series(dtype=float)
+            ),
         )
     if nuclear:
         apply_monthly_availability(
@@ -301,12 +310,23 @@ if __name__ == "__main__":
                 backcast["nuclear_load_following"],
             )
         for carrier in budget_carriers:
+            reported = (
+                gross_electricity(
+                    inputs.eurostat_production,
+                    eurostat_year(n.snapshots, None),
+                    carrier,
+                )
+                if carrier in backcast["energy_budget_eurostat"]
+                else pd.Series(dtype=float)
+            )
             apply_energy_budget(
                 n,
                 generation,
                 area_to_bus,
                 carrier,
                 backcast["monthly_availability_exclude"].get(carrier, []),
+                backcast["energy_budget_monthly_ceiling"],
+                reported,
             )
 
     clip_p_min_pu(n)

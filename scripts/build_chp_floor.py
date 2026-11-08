@@ -30,6 +30,7 @@ import pandas as pd
 import xarray as xr
 
 from scripts._helpers import configure_logging, get_snapshots, set_scenario_config
+from scripts.lib.eurostat import eurostat_year, read_nrg_bal_peh
 
 logger = logging.getLogger(__name__)
 
@@ -59,38 +60,19 @@ FUEL_TECHNOLOGY = {
     "biomass": "central solid biomass CHP",
     "waste": "waste CHP",
 }
-EUROSTAT_COUNTRIES = {"EL": "GR", "UK": "GB"}
 
 
 def read_chp_production(path: str, year: int, fuels: list[str]) -> pd.DataFrame:
     """Read main-activity CHP electricity and heat output in MWh per country and fuel group from Eurostat ``nrg_bal_peh``."""
-    raw = pd.read_csv(path, sep="\t", na_values=":")
-    keys = raw.iloc[:, 0].str.split(",", expand=True)
-    keys.columns = ["freq", "nrg_bal", "siec", "unit", "geo"]
-    columns = {c.strip(): c for c in raw.columns}
-    assert str(year) in columns, f"Eurostat nrg_bal_peh has no data for {year}."
-    values = raw[columns[str(year)]]
-    values = pd.to_numeric(values.astype(str).str.extract(r"([-\d.]+)")[0])
     siec_fuel = {s: f for f in fuels for s in FUEL_SIEC[f]}
-    df = keys.assign(value=values, fuel=keys.siec.map(siec_fuel)).query(
-        "unit == 'GWH' and nrg_bal in ['GEP_MAPCHP', 'GHP_MAPCHP'] and fuel == fuel"
+    df = read_nrg_bal_peh(path, year)
+    df = df.assign(fuel=df.siec.map(siec_fuel)).query(
+        "nrg_bal in ['GEP_MAPCHP', 'GHP_MAPCHP'] and fuel == fuel"
     )
-    df["country"] = df.geo.replace(EUROSTAT_COUNTRIES)
     table = df.pivot_table(
         index=["country", "fuel"], columns="nrg_bal", values="value", aggfunc="sum"
     )
-    return table.rename(
-        columns={"GEP_MAPCHP": "electricity", "GHP_MAPCHP": "heat"}
-    ).mul(1e3)
-
-
-def eurostat_year(snapshots: pd.DatetimeIndex, year: int | None) -> int:
-    """Return the Eurostat reference year, ``year`` if set, else the single snapshot year."""
-    years = snapshots.year.unique()
-    assert len(years) == 1, (
-        f"backcast.chp_floor requires snapshots in one year, got {list(years)}."
-    )
-    return int(years[0]) if year is None else year
+    return table.rename(columns={"GEP_MAPCHP": "electricity", "GHP_MAPCHP": "heat"})
 
 
 def floor_energy(production: pd.DataFrame, c_b: pd.Series) -> pd.Series:

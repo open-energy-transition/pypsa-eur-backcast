@@ -111,15 +111,20 @@ def apply_energy_budget(
     area_to_bus: pd.Series,
     carrier: str,
     exclude: list[str],
+    monthly_ceiling: bool,
+    reported: pd.Series,
 ) -> None:
     """
-    Cap the output of `carrier` per ENTSO-E area at the observed monthly peak and its energy at the observed energy.
+    Cap the energy of `carrier` per ENTSO-E area at the larger of the observed and the `reported` energy.
 
-    ``p_max_pu`` is clipped to the observed hourly peak of the month over the
-    capacity of the area, and ``e_sum_max`` is the observed energy, scaled per
-    month from the hours with data to all hours and shared by ``p_nom``, raised
-    to the must-run energy of ``p_min_pu``. Every month needs observed data.
-    Areas in `exclude` and areas without observed output keep their limits.
+    The observed energy is scaled per month from the hours with data to all
+    hours; every month needs observed data. `reported` holds the annual energy
+    in MWh per country, shared by ``p_nom`` over all generators of `carrier` in
+    the country; leave it empty to cap at the observed energy. ``e_sum_max`` is
+    the area energy shared by ``p_nom`` and raised to the must-run energy of
+    ``p_min_pu``. With `monthly_ceiling`, ``p_max_pu`` is clipped to the observed
+    hourly peak of the month over the capacity of the area. Areas in `exclude`
+    and areas without observed output keep their limits.
     """
     assert_known_areas(exclude, area_to_bus, f"the {carrier} energy budget")
     g = n.generators.query("carrier == @carrier")
@@ -139,11 +144,15 @@ def apply_energy_budget(
     )
     monthly = observed.mul(weights, axis=0).groupby(months).sum().div(hours)
     energy = monthly.mul(month_hours(n), axis=0).sum()
-    peak = observed.groupby(months).transform("max").div(capacity).clip(upper=1)
-    ceiling = peak[areas].set_axis(gens, axis=1)
+    if not reported.empty:
+        countries = g.bus.map(n.buses.country)
+        area_reported = reported_area_energy(g.p_nom, countries, areas, reported)
+        energy = np.maximum(energy, area_reported)
     p_max_pu = n.get_switchable_as_dense("Generator", "p_max_pu", inds=gens)
-    p_max_pu = np.minimum(p_max_pu, ceiling)
-    set_switchable(n, "p_max_pu", p_max_pu)
+    if monthly_ceiling:
+        peak = observed.groupby(months).transform("max").div(capacity).clip(upper=1)
+        p_max_pu = np.minimum(p_max_pu, peak[areas].set_axis(gens, axis=1))
+        set_switchable(n, "p_max_pu", p_max_pu)
     p_min_pu = n.get_switchable_as_dense("Generator", "p_min_pu", inds=gens)
     must_run = p_min_pu.clip(upper=p_max_pu).mul(weights, axis=0).sum() * g.p_nom[gens]
     available = p_max_pu.mul(weights, axis=0).sum() * g.p_nom[gens]
@@ -161,6 +170,16 @@ def apply_energy_budget(
         f"Set the {carrier} energy budget of {sorted(capacity.index)} in TWh: "
         + ", ".join(f"{a} {e / 1e6:.3f}" for a, e in energy.items())
     )
+
+
+def reported_area_energy(
+    p_nom: pd.Series, countries: pd.Series, areas: pd.Series, reported: pd.Series
+) -> pd.Series:
+    """Return the `reported` energy per country shared by `p_nom` over the generators of the country, summed per area of `areas`."""
+    missing = sorted(set(countries[areas.index]) - set(reported.index))
+    assert not missing, f"No reported energy for the countries {missing}."
+    share = p_nom / p_nom.groupby(countries).transform("sum")
+    return (countries.map(reported) * share)[areas.index].groupby(areas).sum()
 
 
 def log_areas(excess: pd.Series, message: str) -> None:

@@ -32,10 +32,9 @@ renewable:
     flatten_dispatch: true
     flatten_dispatch_buffer: 0.2
     PHS_max_hours_cap: geth2015
-    # Inflow per bidding zone from the ENTSO-E water balance (actual generation of run-of-river and reservoir hydro
-    # plus the weekly reservoir filling change, Transparency Platform 16.1.B/C and 16.1.D), reservoir energy capacity
-    # from the maximum observed filling. Experiment E5 in dev/day-ahead-backcast/converge/hydro.md, plan item 1.5.
-    inflow_source: entsoe_balance
+    # EIA inflow until the ENTSO-E water balance inflow (entsoe_balance, plan item 1.5, experiment E5 in
+    # dev/day-ahead-backcast/converge/hydro.md) passes its gate.
+    inflow_source: eia
 
 conventional:
   dynamic_fuel_price: true
@@ -139,6 +138,13 @@ backcast:
   # Excluded areas keep the atlite profile minus the cited self-consumed share in data/solar_self_consumption.csv.
   # Each share applies to every backcast year (reference_year is documentation only); for AT before 2023 it is likely too high, as the feed-in-tariff fleet was a larger fraction.
   # Factors are ENTSO-E solar over model available solar of the backcast composed networks 2019/2020/2023/2024; 2021, 2022 and 2025 are not checked yet.
+  # With solar_unpublished, calibrated areas in data/solar_unpublished.csv add grid-fed PV that ENTSO-E does not publish to their
+  # target (plan item 1.4, dev/backcast-accuracy/p1-retune/solar/diagnosis.md option 1, unpublished.py): per country
+  # max(0, min(Eurostat PV - ENTSO-E solar, load - generation - net scheduled imports - biomass budget uplift)), split over
+  # its areas by ENTSO-E solar, DE_LU counting DE and LU. The biomass budget raised to Eurostat (energy_budget_eurostat)
+  # claims the balance gap first, as far as the biomass capacity can produce it; solar gets only the remainder. SE is left
+  # out (ENTSO-E publishes no SE biomass or CHP, its gap is unpublished thermal output), NO too (only NO_1 publishes solar,
+  # 2 GWh from 2024-05).
   calibrate_solar: true
   solar_calibration_factor_bounds: [0.35, 2.0]
   solar_calibration_exclude:

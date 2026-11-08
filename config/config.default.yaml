@@ -606,6 +606,7 @@ backcast:
   wind_curtailment_twh: {}
   wind_target_twh: {}
   calibrate_solar: false
+  solar_unpublished: false
   solar_calibration_exclude: []
   solar_calibration_factor_bounds:
   - 0.5
@@ -618,6 +619,8 @@ backcast:
   nuclear_min_output: false
   nuclear_load_following: {}
   energy_budget_carriers: []
+  energy_budget_monthly_ceiling: true
+  energy_budget_eurostat: []
   fuel_price: {}
   exclude_generation_areas: []
   hybrid_capacities:

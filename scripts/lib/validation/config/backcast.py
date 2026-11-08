@@ -207,7 +207,11 @@ class BackcastConfig(ConfigModel):
     )
     calibrate_solar: bool = Field(
         False,
-        description="Scale the solar availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual solar generation reported by the ENTSO-E Transparency Platform, i.e. the grid-fed output on the same basis as the ENTSO-E load. Only months with actual solar generation are compared. One factor per area, `p_max_pu` is clipped at 1. Areas that publish generation but no solar get zero solar availability. Areas in `solar_calibration_exclude` and in `exclude_generation_areas` are not calibrated; the self-consumed share of their country in `data/solar_self_consumption.csv` is removed from their availability instead, countries without a share keep it. Requires `foresight: overnight`.",
+        description="Scale the solar availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual solar generation reported by the ENTSO-E Transparency Platform, i.e. the grid-fed output on the same basis as the ENTSO-E load. Only months with actual solar generation are compared. One factor per area, `p_max_pu` is clipped at 1. Areas that publish generation but no solar get zero solar availability. Areas in `solar_calibration_exclude` and in `exclude_generation_areas` are not calibrated; the self-consumed share of their country in `data/solar_self_consumption.csv` is removed from their availability instead, countries without a share keep it. With `solar_unpublished`, calibrated areas add the solar generation that ENTSO-E does not publish to their target. Requires `foresight: overnight`.",
+    )
+    solar_unpublished: bool = Field(
+        False,
+        description="Add the grid-fed solar generation in TWh that ENTSO-E does not publish but that serves the ENTSO-E load, per area from `data/solar_unpublished.csv` for the snapshot year, to the targets of `calibrate_solar`. The file must have rows for the snapshot year. Requires `calibrate_solar`.",
     )
     solar_calibration_exclude: list[str] = Field(
         default_factory=list,
@@ -249,7 +253,15 @@ class BackcastConfig(ConfigModel):
     )
     energy_budget_carriers: list[str] = Field(
         default_factory=list,
-        description="Generator carriers whose availability (`p_max_pu`) per ENTSO-E area is clipped to the peak hourly actual generation of the month over the capacity of the area and whose energy over the snapshots (`e_sum_max`) is the actual generation of the area, scaled per month from the hours with data to all hours (every month needs data), shared by `p_nom` and raised to the must-run energy of `p_min_pu`. Areas in `monthly_availability_exclude` of the carrier and areas without actual generation of the carrier keep their limits. Requires `foresight: overnight`.",
+        description="Generator carriers whose energy over the snapshots (`e_sum_max`) per ENTSO-E area is the actual generation of the area, scaled per month from the hours with data to all hours (every month needs data), raised to the Eurostat value for carriers in `energy_budget_eurostat`, shared by `p_nom` and raised to the must-run energy of `p_min_pu`. With `energy_budget_monthly_ceiling`, their availability (`p_max_pu`) is clipped to the peak hourly actual generation of the month over the capacity of the area. Areas in `monthly_availability_exclude` of the carrier and areas without actual generation of the carrier keep their limits. Requires `foresight: overnight`.",
+    )
+    energy_budget_monthly_ceiling: bool = Field(
+        True,
+        description="Clip the availability (`p_max_pu`) of the `energy_budget_carriers` per ENTSO-E area to the peak hourly actual generation of the month over the capacity of the area.",
+    )
+    energy_budget_eurostat: list[Literal["biomass"]] = Field(
+        default_factory=list,
+        description="Carriers of `energy_budget_carriers` whose energy per ENTSO-E area is the larger of the actual generation and the Eurostat `nrg_bal_peh` gross electricity production of all producers including autoproducers in the snapshot year (biomass: bioenergy `BIOE` minus renewable municipal waste `W6210`), shared by `p_nom` over the generators of the carrier in each country. ENTSO-E misses most autoproducer output, e.g. FI pulp mills.",
     )
     fuel_price: dict[str, Annotated[float, Field(ge=0)]] = Field(
         default_factory=dict,
@@ -342,12 +354,26 @@ class BackcastConfig(ConfigModel):
         return self
 
     @model_validator(mode="after")
+    def check_solar_unpublished(self) -> "BackcastConfig":
+        """Require `calibrate_solar` for the unpublished solar generation."""
+        assert self.calibrate_solar or not self.solar_unpublished, (
+            "backcast: solar_unpublished requires calibrate_solar."
+        )
+        return self
+
+    @model_validator(mode="after")
     def check_energy_budget_carriers(self) -> "BackcastConfig":
-        """Require no carrier with both monthly availability and energy budget."""
+        """Require no carrier with both monthly availability and energy budget and Eurostat budgets only for budget carriers."""
         overlap = sorted(
             set(self.energy_budget_carriers) & set(self.monthly_availability_carriers)
         )
         assert not overlap, (
             f"backcast: carriers in both energy_budget_carriers and monthly_availability_carriers: {overlap}"
+        )
+        unbudgeted = sorted(
+            set(self.energy_budget_eurostat) - set(self.energy_budget_carriers)
+        )
+        assert not unbudgeted, (
+            f"backcast: carriers in energy_budget_eurostat but not in energy_budget_carriers: {unbudgeted}"
         )
         return self

@@ -324,7 +324,9 @@ def test_apply_monthly_availability_raises(
         ("onwind", lambda n, g: calibrate_wind(n, g, AREA_TO_BUS, {}, {}, WIDE, {})),
         (
             "solar",
-            lambda n, g: calibrate_solar(n, g, AREA_TO_BUS, [], WIDE, NO_SHARE),
+            lambda n, g: calibrate_solar(
+                n, g, AREA_TO_BUS, [], WIDE, NO_SHARE, NO_SHARE
+            ),
         ),
         (
             "nuclear",
@@ -361,6 +363,7 @@ def test_calibration_fails_on_unmapped_generators(network, carrier, calibrate):
             AREA_TO_BUS,
             [],
             WIDE,
+            NO_SHARE,
             NO_SHARE,
         ),
     ],

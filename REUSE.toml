@@ -62,6 +62,7 @@ path = [
     "data/custom_powerplants.csv",
     "data/backcast_lignite_p_min_pu.csv",
     "data/solar_self_consumption.csv",
+    "data/solar_unpublished.csv",
     "data/entsoe_external_borders.csv",
 ]
 SPDX-FileCopyrightText = "The PyPSA-Eur Authors"

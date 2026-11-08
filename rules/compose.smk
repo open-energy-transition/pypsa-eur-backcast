@@ -126,6 +126,14 @@ def get_compose_inputs(w):
             if cfg["backcast"]["calibrate_solar"]
             else []
         ),
+        solar_unpublished=(
+            "data/solar_unpublished.csv" if cfg["backcast"]["solar_unpublished"] else []
+        ),
+        eurostat_production=(
+            f"{EUROSTAT_CHP_DATA['folder']}/estat_nrg_bal_peh.tsv.gz"
+            if cfg["backcast"]["energy_budget_eurostat"]
+            else []
+        ),
         unavailability=resources("unavailability.csv") if unavailability else [],
         unavailability_coverage=(
             resources("unavailability_coverage.csv") if unavailability else []

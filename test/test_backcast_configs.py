@@ -13,6 +13,7 @@ import yaml
 from entsoe.mappings import Area
 from snakemake.utils import update_config
 
+from scripts.lib.backcast_calibration import read_solar_unpublished
 from scripts.lib.entsoe import read_area_to_bus
 from scripts.lib.validation.config import validate_config, validate_scenarios
 
@@ -123,10 +124,12 @@ def test_external_borders_known(scenario):
         ("backcast.monthly_nuclear_availability", False),
         ("backcast.nuclear_min_output", False),
         ("backcast.energy_budget_carriers", []),
+        ("backcast.energy_budget_eurostat", []),
         ("backcast.chp_floor.enable", False),
         ("backcast.hybrid_capacities.enable", False),
         ("backcast.external_flows.enable", False),
-        ("backcast.fuel_price", {"nuclear": 7.4536, "biomass": 9.3506}),
+        ("backcast.solar_unpublished", False),
+        ("backcast.fuel_price", {"nuclear": 7.4536}),
     ],
 )
 def test_plain_scenario_unrefined(path, off):
@@ -134,6 +137,23 @@ def test_plain_scenario_unrefined(path, off):
     for key in path.split("."):
         config = config[key]
     assert config == off
+
+
+def test_solar_unpublished_calibrated(scenario):
+    _, year, config = scenario
+    backcast = config["backcast"]
+    if not backcast.get("solar_unpublished", False):
+        return
+    areas = set(read_solar_unpublished(ROOT / "data/solar_unpublished.csv", year).index)
+    assert areas <= set(
+        read_area_to_bus(
+            ROOT / backcast.get("area_to_bus", "data/entsoe_area_to_bus.csv")
+        )
+    )
+    excluded = (
+        backcast["solar_calibration_exclude"] + backcast["exclude_generation_areas"]
+    )
+    assert not areas & set(excluded)
 
 
 ENTSOE_INSTALLED = pd.read_csv(ROOT / "test/test_data/backcast_installed_capacity.csv")

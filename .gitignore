@@ -58,6 +58,7 @@ data/costs_*.csv
 !/data/entsoe_external_borders.csv
 !/data/backcast_lignite_p_min_pu.csv
 !/data/solar_self_consumption.csv
+!/data/solar_unpublished.csv
 
 dask-worker-space/
 publications.jrc.ec.europa.eu/

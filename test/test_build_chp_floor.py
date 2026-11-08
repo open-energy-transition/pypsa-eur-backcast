@@ -9,12 +9,12 @@ import pypsa
 import pytest
 
 from scripts.build_chp_floor import (
-    eurostat_year,
     floor_energy,
     heat_profile,
     read_chp_production,
 )
 from scripts.lib.conventional import apply_chp_floor, clip_p_min_pu
+from scripts.lib.eurostat import eurostat_year, gross_electricity
 
 SNAPSHOTS = pd.date_range("2023-01-01", periods=72, freq="h")
 TSV = """freq,nrg_bal,siec,unit,geo\\TIME_PERIOD\t2022 \t2023
@@ -70,6 +70,31 @@ def test_read_chp_production_oil(tmp_path, siec, expected):
     production = read_chp_production(str(path), 2023, ["gas", "oil"])
 
     assert production["electricity"].get(("IT", "oil")) == expected
+
+
+@pytest.mark.parametrize(
+    ("rows", "expected"),
+    [
+        ([("GEP", "BIOE", "DE", "50"), ("GEP", "W6210", "DE", "6")], {"DE": 44e3}),
+        ([("GEP", "BIOE", "EL", "2 p"), ("GEP", "W6210", "FI", "1")], {"GR": 2e3}),
+        ([("GEP", "BIOE", "FI", ":"), ("GEP", "W6210", "FI", "1")], {}),
+        ([("GEP_MAPCHP", "BIOE", "DE", "50"), ("GEP", "R5300", "DE", "5")], {}),
+    ],
+    ids=["net-of-renewable-waste", "country-codes", "no-biomass", "other-rows"],
+)
+def test_gross_electricity(tmp_path, rows, expected):
+    path = tmp_path / "nrg_bal_peh.tsv"
+    lines = [f"A,{bal},{siec},GWH,{geo}\t{value}\n" for bal, siec, geo, value in rows]
+    path.write_text("freq,nrg_bal,siec,unit,geo\\TIME_PERIOD\t2023\n" + "".join(lines))
+
+    reported = gross_electricity(str(path), 2023, "biomass")
+
+    pd.testing.assert_series_equal(
+        reported,
+        pd.Series(expected, dtype=float),
+        check_names=False,
+        check_index_type=False,
+    )
 
 
 @pytest.mark.parametrize(("year", "expected"), [(None, 2023), (2022, 2022)])

@@ -241,6 +241,7 @@ def calibrate_solar(
     exclude: list[str],
     factor_bounds: list[float],
     self_consumption: pd.Series,
+    unpublished_twh: pd.Series,
 ) -> None:
     """
     Scale the solar availability per area to the grid-fed solar generation.
@@ -254,7 +255,8 @@ def calibrate_solar(
     calibrated. Instead, the self-consumed share of their country in
     `self_consumption` is removed from their availability, so that their
     solar is grid-fed as well. Countries without a share keep their
-    availability. Factors outside `factor_bounds` raise an error.
+    availability. The `unpublished_twh` of a calibrated area is added to
+    its target. Factors outside `factor_bounds` raise an error.
 
     Parameters
     ----------
@@ -270,8 +272,11 @@ def calibrate_solar(
         Lower and upper bound of the calibration factors.
     self_consumption : pd.Series
         Self-consumed share of the solar generation per country.
+    unpublished_twh : pd.Series
+        Grid-fed solar generation in TWh missing from ENTSO-E per area.
     """
     assert_known_areas(exclude, area_to_bus, "the solar calibration")
+    assert_known_areas(unpublished_twh.index, area_to_bus, "the unpublished solar")
     invalid = self_consumption[~self_consumption.between(0, 1, inclusive="left")]
     assert invalid.empty, (
         f"Solar self-consumption shares outside [0, 1): {invalid.to_dict()}"
@@ -286,21 +291,33 @@ def calibrate_solar(
     energy = area_energy(n, generation, ["solar"])
     calibrated = energy.index.unique("area")
     months = snapshot_months(n)
+    targets = set(calibrated) & set(areas) - set(exclude)
+    uncalibrated = sorted(set(unpublished_twh.index) - targets)
+    assert not uncalibrated, f"Unpublished solar for uncalibrated areas: {uncalibrated}"
     for area, gens in solar.groupby(areas).items():
         if area in exclude or area not in published:
             remove_self_consumption(n, gens, area, countries[gens], self_consumption)
         elif area in calibrated:
             actual = energy[area]["solar"]
             mask = months.isin(actual.index)
-            scale_availability(
-                n, gens, mask, actual.sum(), factor_bounds, "solar", area
-            )
+            target = actual.sum() + unpublished_twh.get(area, 0.0) * 1e6
+            scale_availability(n, gens, mask, target, factor_bounds, "solar", area)
         else:
             n.generators_t.p_max_pu[gens] = 0.0
             logger.warning(
                 f"No actual solar generation published for {area}, setting the "
                 f"availability of its {g.p_nom[gens].sum():.0f} MW to zero."
             )
+
+
+def read_solar_unpublished(path: str, year: int) -> pd.Series:
+    """Read the unpublished grid-fed solar generation in TWh per area of `year`, which must have rows."""
+    data = pd.read_csv(path).query("year == @year")
+    assert not data.empty, f"No unpublished solar generation for {year} in {path}."
+    assert data.area.is_unique, (
+        f"Duplicate areas for {year} in {path}: {sorted(data.area[data.area.duplicated()])}"
+    )
+    return data.set_index("area").twh
 
 
 def remove_self_consumption(
