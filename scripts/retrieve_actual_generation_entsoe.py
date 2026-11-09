@@ -9,7 +9,7 @@ and stored in its native market time unit with UTC timestamps. Only the
 aggregated generation is kept, the consumption of e.g. pumped storage is
 dropped. An API token must be set in the environment variable
 ``ENTSOE_API_TOKEN``. Areas without published data, e.g. ``GB`` after 2020,
-raise an error and must be listed in ``backcast: exclude_generation_areas``.
+raise an error and must be listed in ``backcast: market_data: generation: exclude_areas``.
 """
 
 import logging

@@ -8,7 +8,7 @@ Three series are queried through the ENTSO-E API for the calendar year in UTC
 in monthly chunks: the day-ahead offered capacity of implicit allocations
 (``offered_capacity``), the day-ahead net transfer capacity (``ntc``) and the
 day-ahead scheduled commercial exchanges (``scheduled_exchange``). Borders
-with an area of ``backcast: external_flows: areas`` also get the total
+with an area of ``backcast: areas: external: areas`` also get the total
 scheduled commercial exchanges (``scheduled_exchange_total``), as most borders
 to areas outside the model publish no day-ahead exchanges, and the physical
 flows (``physical_flow``), as FI-RU publishes no scheduled exchanges. Capacities

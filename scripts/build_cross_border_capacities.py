@@ -13,11 +13,11 @@ netted per hour, the monthly maximum is taken over both directions of the
 border, so that the capacity of the less used direction is not zero. The net
 transfer capacity takes precedence, as the offered capacities of the Italian
 internal borders are published with swapped directions. Gaps of the chosen
-source up to ``backcast: max_capacity_gap_hours`` are interpolated, longer gaps
-raise an error, unless ``backcast: exchange_proxy_fallback`` fills them with
+source up to ``backcast: market_data: capacities: max_gap_hours`` are interpolated, longer gaps
+raise an error, unless ``backcast: interconnection: proxy: fallback`` fills them with
 the monthly maximum of the scheduled exchanges, e.g. for the Nordic borders
 after the start of flow-based market coupling on 2024-10-29. Borders between two
-areas of ``backcast: exchange_proxy_by_direction_areas`` take the monthly maximum
+areas of ``backcast: interconnection: proxy: by_direction_areas`` take the monthly maximum
 per direction instead. Within a flow-based region without published capacities,
 e.g. the Nordic region from 2024-10-29, the maximum over both directions gives
 rarely used directions the capacity of the busy one, e.g. NO_1->NO_3 2,918 MW
@@ -28,18 +28,18 @@ Some published net transfer capacities are outdated and lower than the
 scheduled exchanges, e.g. on the borders within the Core region that still
 publish them. Therefore, the capacity is raised to the hourly scheduled
 exchange where it is lower, so that the observed exchanges remain feasible.
-Borders listed in ``backcast: exchange_proxy_borders`` use the monthly maximum
+Borders listed in ``backcast: interconnection: proxy: borders`` use the monthly maximum
 of the scheduled exchanges regardless of published capacities. All series are
 converted to UTC before resampling to hourly means.
 
 The borders are the lines and DC links between buses of different ENTSO-E
-areas in ``backcast: area_to_bus``. If several bus pairs share one area
+areas in ``backcast: areas: area_to_bus``. If several bus pairs share one area
 border, its capacity is split in proportion to their physical transmission
 capacity. Copperplate connections and connections within one area are not
-considered. Borders listed in ``backcast: fixed_border_capacities`` get a
+considered. Borders listed in ``backcast: interconnection: fixed`` get a
 constant capacity in both directions instead, either in MW or the physical
 capacity of the network. The build fails if any other border lacks data, e.g.
-if it is missing in ``backcast: borders``, which lists the borders to
+if it is missing in ``backcast: areas: borders``, which lists the borders to
 retrieve.
 
 The first output holds the capacities in MW with columns ``<bus0>-><bus1>``,
@@ -91,7 +91,7 @@ def area_capacities(
     names = [border_name(*d) for d in directions]
     missing = [name for d, name in zip(directions, names) if d not in data.index]
     assert not missing, (
-        f"No cross-border capacity data for {missing}, check `backcast: borders`."
+        f"No cross-border capacity data for {missing}, check `backcast: areas: borders`."
     )
     hourly = {
         name: data.loc[d, SOURCES].resample("h").mean().reindex(snapshots)

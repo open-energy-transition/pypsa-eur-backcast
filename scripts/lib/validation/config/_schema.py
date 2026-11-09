@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from scripts.lib.backcast_dispatch import dispatch_carriers
 from scripts.lib.validation.config._base import ConfigModel
 from scripts.lib.validation.config.adjustments import AdjustmentsConfig
 from scripts.lib.validation.config.atlite import AtliteConfig
@@ -257,20 +258,20 @@ class ConfigSchema(BaseModel):
     @model_validator(mode="after")
     def check_backcast_calibration_foresight(self) -> "ConfigSchema":
         """Require overnight foresight for the backcast calibration."""
+        backcast = self.backcast
+        dispatch = dispatch_carriers(backcast.dispatch.model_dump())
         calibrate = (
-            self.backcast.calibrate_wind
-            or self.backcast.calibrate_solar
-            or self.backcast.monthly_nuclear_availability
-            or self.backcast.monthly_availability_carriers
-            or self.backcast.unavailability.enable
-            or self.backcast.nuclear_min_output
-            or self.backcast.energy_budget_carriers
-            or self.backcast.external_flows.enable
+            backcast.renewables.wind.calibrate
+            or backcast.renewables.solar.calibrate
+            or dispatch.uses_monthly_generation
+            or dispatch.uses_hourly_generation
+            or dispatch.outages
+            or backcast.areas.external.enable
         )
         assert self.foresight.root == "overnight" or not calibrate, (
-            "backcast: calibrate_wind, calibrate_solar, monthly_nuclear_availability, "
-            "monthly_availability_carriers, unavailability, nuclear_min_output, "
-            "energy_budget_carriers and external_flows require foresight: overnight."
+            "backcast: renewables: wind and solar: calibrate, dispatch: <carrier>: "
+            "availability, energy, nuclear: min_output and areas: external "
+            "require foresight: overnight."
         )
         return self
 
@@ -279,8 +280,8 @@ class ConfigSchema(BaseModel):
         """Require ENTSO-E cross-border capacities for the hybrid capacities."""
         assert (
             self.electricity.cross_border_capacities == "ntc"
-            or not self.backcast.hybrid_capacities.enable
+            or not self.backcast.interconnection.hybrid.enable
         ), (
-            "backcast: hybrid_capacities requires electricity: cross_border_capacities: ntc."
+            "backcast: interconnection: hybrid requires electricity: cross_border_capacities: ntc."
         )
         return self

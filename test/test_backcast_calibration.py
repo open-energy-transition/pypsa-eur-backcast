@@ -374,36 +374,42 @@ def test_calibration_warns_on_clipping(network, caplog, calibrate):
     assert "Clipping loses more than 1%" in caplog.text
 
 
+def wind(**wind: object) -> dict:
+    return {"renewables": {"wind": wind}}
+
+
+def solar(**solar: object) -> dict:
+    return {"renewables": {"solar": solar}}
+
+
+def hybrid(**hybrid: object) -> dict:
+    return {"interconnection": {"hybrid": hybrid}}
+
+
+GB_EXCLUDED = {"market_data": {"generation": {"exclude_areas": ["GB"]}}}
+
+
 @pytest.mark.parametrize(
     "config",
     [
-        {"wind_curtailment_twh": {"DE_LU": -1.0}},
-        {"wind_curtailment_twh": {"DE_LU": {"solar": 1.0}}},
-        {"hybrid_capacities": {"sources": ["offered_capacity"]}},
-        {"hybrid_capacities": {"physical_factor": 0.0}},
-        {"hybrid_capacities": {"sources": []}},
-        {"wind_calibration_factor_bounds": [2.0, 0.5]},
-        {"wind_calibration_factor_bounds": [0.0, 2.0]},
-        {"wind_calibration_factor_bounds": [0.5]},
-        {"solar_calibration_factor_bounds": [2.0, 0.5]},
-        {"solar_calibration_factor_bounds": [0.0, 2.0]},
-        {"solar_calibration_factor_bounds": [0.5, 1.0, 2.0]},
-        {"nuclear_phase_out": {"DE_LU": "April"}},
-        {"nuclear_phase_out": {"DE_LU": datetime.date(2023, 4, 15)}},
-        {"wind_target_twh": {"GB": {"onwind": 1.0}}},
-        {"wind_target_twh": {"GB": {"solar": 1.0}}, "exclude_generation_areas": ["GB"]},
-        {
-            "wind_target_twh": {"GB": {"onwind": -1.0}},
-            "exclude_generation_areas": ["GB"],
-        },
-        {
-            "unavailability": {"enable": True},
-            "monthly_availability_carriers": ["coal"],
-        },
-        {
-            "unavailability": {"enable": True, "carriers": ["nuclear"]},
-            "monthly_nuclear_availability": False,
-        },
+        wind(curtailment_twh={"DE_LU": -1.0}),
+        wind(curtailment_twh={"DE_LU": {"solar": 1.0}}),
+        hybrid(sources=["offered_capacity"]),
+        hybrid(physical_factor=0.0),
+        hybrid(sources=[]),
+        wind(factor_bounds=[2.0, 0.5]),
+        wind(factor_bounds=[0.0, 2.0]),
+        wind(factor_bounds=[0.5]),
+        solar(factor_bounds=[2.0, 0.5]),
+        solar(factor_bounds=[0.0, 2.0]),
+        solar(factor_bounds=[0.5, 1.0, 2.0]),
+        {"dispatch": {"nuclear": {"phase_out": {"DE_LU": "April"}}}},
+        {"dispatch": {"nuclear": {"phase_out": {"DE_LU": datetime.date(2023, 4, 15)}}}},
+        wind(target_twh={"GB": {"onwind": 1.0}}),
+        wind(target_twh={"GB": {"solar": 1.0}}) | GB_EXCLUDED,
+        wind(target_twh={"GB": {"onwind": -1.0}}) | GB_EXCLUDED,
+        {"interconnection": {"fixed": {"DE_LU": 0}}},
+        {"interconnection": {"proxy": {"borders": ["DE_LU-"]}}},
     ],
 )
 def test_backcast_config_rejects_invalid_calibration(config):
@@ -413,14 +419,21 @@ def test_backcast_config_rejects_invalid_calibration(config):
 
 def test_backcast_config_accepts_per_carrier_curtailment():
     curtailment = {"DE_LU": {"onwind": 6.0, "offwind": 4.0}, "DK_1": 1.0}
-    config = BackcastConfig(wind_curtailment_twh=curtailment)
-    assert config.wind_curtailment_twh == curtailment
+    config = BackcastConfig(**wind(curtailment_twh=curtailment))
+    assert config.renewables.wind.curtailment_twh == curtailment
 
 
 @pytest.mark.parametrize("foresight", ["myopic", "perfect"])
-@pytest.mark.parametrize("key", ["calibrate_wind", "calibrate_solar"])
-def test_backcast_calibration_requires_overnight_foresight(foresight, key):
-    backcast = {key: True}
+@pytest.mark.parametrize(
+    "backcast",
+    [
+        wind(calibrate=True),
+        solar(calibrate=True),
+        {"dispatch": {"nuclear": {"availability": "monthly"}}},
+        {"dispatch": {"coal": {"availability": "outages"}}},
+    ],
+)
+def test_backcast_calibration_requires_overnight_foresight(foresight, backcast):
     validate_config({"backcast": backcast})
     with pytest.raises(ValueError, match="require foresight: overnight"):
         validate_config({"foresight": foresight, "backcast": backcast})
@@ -428,7 +441,7 @@ def test_backcast_calibration_requires_overnight_foresight(foresight, key):
 
 def test_hybrid_capacities_require_ntc():
     with pytest.raises(ValueError, match="requires electricity: cross_border"):
-        validate_config({"backcast": {"hybrid_capacities": {"enable": True}}})
+        validate_config({"backcast": hybrid(enable=True)})
 
 
 def test_apply_monthly_availability_pools_mapped_areas(network):

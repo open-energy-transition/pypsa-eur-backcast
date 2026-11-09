@@ -706,7 +706,7 @@ if (ENTSOE_CAPACITIES_DATA := dataset_version("entsoe_cross_border_capacities"))
         resources:
             mem_mb=2000,
         params:
-            external_areas=config_provider("backcast", "external_flows", "areas"),
+            external_areas=config_provider("backcast", "areas", "external", "areas"),
         script:
             scripts("retrieve_cross_border_capacities_entsoe.py")
 

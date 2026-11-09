@@ -59,7 +59,7 @@ def sources(run_dir: Path) -> dict[str, Path]:
         "regions": resources / "onshore_regions.geojson",
         "metrics": run_dir / "backcast/price_metrics.csv",
         "monthly_bias": run_dir / "backcast/price_monthly_bias.csv",
-        "area_to_bus": Path(config["backcast"]["area_to_bus"]),
+        "area_to_bus": Path(config["backcast"]["areas"]["area_to_bus"]),
     }
 
 

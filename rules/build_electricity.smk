@@ -489,7 +489,9 @@ rule build_daily_gas_prices:
 
 
 def modelled_entsoe_areas(w) -> set[str]:
-    area_to_bus = read_area_to_bus(config_provider("backcast", "area_to_bus")(w))
+    area_to_bus = read_area_to_bus(
+        config_provider("backcast", "areas", "area_to_bus")(w)
+    )
     countries = config_provider("countries")(w)
     return set(area_to_bus[area_to_bus.index.str[:2].isin(countries)])
 
@@ -499,7 +501,7 @@ def snapshot_years(w) -> list[int]:
 
 
 def input_day_ahead_prices(w) -> list[str]:
-    exclude = config_provider("backcast", "exclude_price_areas")(w)
+    exclude = config_provider("backcast", "market_data", "prices", "exclude_areas")(w)
     areas = modelled_entsoe_areas(w) - set(exclude)
     return expand(
         f"{ENTSOE_PRICES_DATA['folder']}/day_ahead_prices_{{area}}_{{year}}.csv",
@@ -509,7 +511,7 @@ def input_day_ahead_prices(w) -> list[str]:
 
 
 def input_external_exchanges(w) -> list[str]:
-    external = config_provider("backcast", "external_flows")(w)
+    external = config_provider("backcast", "areas", "external")(w)
     if not external["enable"]:
         return []
     borders = pd.read_csv("data/entsoe_external_borders.csv")
@@ -527,8 +529,8 @@ def input_external_exchanges(w) -> list[str]:
 
 def input_cross_border_capacities(w) -> list[str]:
     areas = modelled_entsoe_areas(w)
-    fixed = config_provider("backcast", "fixed_border_capacities")(w)
-    borders = pd.read_csv(config_provider("backcast", "borders")(w))
+    fixed = config_provider("backcast", "interconnection", "fixed")(w)
+    borders = pd.read_csv(config_provider("backcast", "areas", "borders")(w))
     borders = borders[
         borders.area0.isin(areas)
         & borders.area1.isin(areas)
@@ -550,7 +552,7 @@ rule build_day_ahead_prices:
     input:
         prices=input_day_ahead_prices,
         exchange_rates=f"{ECB_EXCHANGE_RATES_DATASET['folder']}/eurofxref-hist.csv",
-        area_to_bus=config_provider("backcast", "area_to_bus"),
+        area_to_bus=config_provider("backcast", "areas", "area_to_bus"),
         network=resources("networks/clustered.nc"),
     output:
         csv=resources("day_ahead_prices.csv"),
@@ -564,18 +566,26 @@ rule build_day_ahead_prices:
     params:
         snapshots=config_provider("snapshots"),
         drop_leap_day=config_provider("enable", "drop_leap_day"),
-        exclude_price_areas=config_provider("backcast", "exclude_price_areas"),
-        exclude_price_buses=config_provider("backcast", "exclude_price_buses"),
-        max_price_gap_hours=config_provider("backcast", "max_price_gap_hours"),
+        exclude_price_areas=config_provider(
+            "backcast", "market_data", "prices", "exclude_areas"
+        ),
+        exclude_price_buses=config_provider(
+            "backcast", "market_data", "prices", "exclude_buses"
+        ),
+        max_price_gap_hours=config_provider(
+            "backcast", "market_data", "prices", "max_gap_hours"
+        ),
         max_price_gap_hours_by_area=config_provider(
-            "backcast", "max_price_gap_hours_by_area"
+            "backcast", "market_data", "prices", "max_gap_hours_by_area"
         ),
     script:
         scripts("build_day_ahead_prices.py")
 
 
 def generation_areas(w) -> list[str]:
-    exclude = config_provider("backcast", "exclude_generation_areas")(w)
+    exclude = config_provider("backcast", "market_data", "generation", "exclude_areas")(
+        w
+    )
     return sorted(modelled_entsoe_areas(w) - set(exclude))
 
 
@@ -630,7 +640,7 @@ rule build_unavailability:
     input:
         unpack(input_unavailability),
         powerplants=resources("powerplants.csv"),
-        area_to_bus=config_provider("backcast", "area_to_bus"),
+        area_to_bus=config_provider("backcast", "areas", "area_to_bus"),
     output:
         csv=resources("unavailability.csv"),
         coverage=resources("unavailability_coverage.csv"),
@@ -645,7 +655,9 @@ rule build_unavailability:
         snapshots=config_provider("snapshots"),
         drop_leap_day=config_provider("enable", "drop_leap_day"),
         areas=unavailability_areas,
-        carriers=config_provider("backcast", "unavailability", "carriers"),
+        carriers=lambda w: dispatch_carriers(
+            config_provider("backcast", "dispatch")(w)
+        ).outages,
     script:
         scripts("build_unavailability.py")
 
@@ -672,7 +684,7 @@ rule build_chp_floor:
     params:
         snapshots=config_provider("snapshots"),
         drop_leap_day=config_provider("enable", "drop_leap_day"),
-        chp_floor=config_provider("backcast", "chp_floor"),
+        chp_floor=config_provider("backcast", "dispatch", "chp_floor"),
     script:
         scripts("build_chp_floor.py")
 
@@ -681,7 +693,7 @@ rule build_cross_border_capacities:
     """Builds hourly cross-border capacities between the buses of the bidding zone clustered network."""
     input:
         capacities=input_cross_border_capacities,
-        area_to_bus=config_provider("backcast", "area_to_bus"),
+        area_to_bus=config_provider("backcast", "areas", "area_to_bus"),
         network=resources("networks/clustered.nc"),
     output:
         capacities=resources("cross_border_capacities.csv"),
@@ -697,12 +709,18 @@ rule build_cross_border_capacities:
     params:
         snapshots=config_provider("snapshots"),
         drop_leap_day=config_provider("enable", "drop_leap_day"),
-        fixed_border_capacities=config_provider("backcast", "fixed_border_capacities"),
-        max_capacity_gap_hours=config_provider("backcast", "max_capacity_gap_hours"),
-        exchange_proxy_borders=config_provider("backcast", "exchange_proxy_borders"),
-        exchange_proxy_fallback=config_provider("backcast", "exchange_proxy_fallback"),
+        fixed_border_capacities=config_provider("backcast", "interconnection", "fixed"),
+        max_capacity_gap_hours=config_provider(
+            "backcast", "market_data", "capacities", "max_gap_hours"
+        ),
+        exchange_proxy_borders=config_provider(
+            "backcast", "interconnection", "proxy", "borders"
+        ),
+        exchange_proxy_fallback=config_provider(
+            "backcast", "interconnection", "proxy", "fallback"
+        ),
         exchange_proxy_by_direction_areas=config_provider(
-            "backcast", "exchange_proxy_by_direction_areas"
+            "backcast", "interconnection", "proxy", "by_direction_areas"
         ),
     script:
         scripts("build_cross_border_capacities.py")
@@ -745,7 +763,7 @@ def input_hydro_balance(w) -> dict[str, str | list[str]]:
     }
     return dict(
         entsoe_generation=resources("entsoe_generation_hourly.csv"),
-        area_to_bus=config_provider("backcast", "area_to_bus")(w),
+        area_to_bus=config_provider("backcast", "areas", "area_to_bus")(w),
         **filling,
     )
 

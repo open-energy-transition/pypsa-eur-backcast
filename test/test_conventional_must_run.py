@@ -257,19 +257,35 @@ def test_set_fuel_price_unknown_technology():
 
 
 @pytest.mark.parametrize(
-    "config, match",
+    "dispatch, match",
     [
         (
-            {
-                "energy_budget_carriers": ["biomass"],
-                "monthly_availability_carriers": ["biomass"],
-            },
-            "energy_budget_carriers",
+            {"biomass": {"availability": "monthly", "energy": "budget"}},
+            "energy requires availability other than monthly",
         ),
-        ({"energy_budget_eurostat": ["biomass"]}, "energy_budget_carriers"),
-        ({"energy_budget_fixed": ["biomass"]}, "energy_budget_carriers"),
+        (
+            {"nuclear": {"availability": "monthly", "energy": "budget"}},
+            "energy requires availability other than monthly",
+        ),
+        ({"waste": {"energy": "fixed"}}, r"\['biomass'\] only, not \['waste'\]"),
+        ({"coal": {"energy": "eurostat_budget"}}, r"only, not \['coal'\]"),
+        ({"coal": {"availability": "hourly"}}, "availability"),
+        ({"gas": {"availability": "monthly"}}, "gas"),
+        ({"nuclear": {"phase_out": {"DE_LU": "2023-13-01"}}}, "phase_out"),
     ],
 )
-def test_energy_budget_config_invalid(config, match):
+def test_dispatch_config_invalid(dispatch, match):
     with pytest.raises(ValidationError, match=match):
-        BackcastConfig(**config)
+        BackcastConfig(dispatch=dispatch)
+
+
+@pytest.mark.parametrize(
+    "dispatch",
+    [
+        {"biomass": {"availability": "outages", "energy": "fixed"}},
+        {"coal": {"availability": "monthly"}, "biomass": {"energy": "budget"}},
+        {"nuclear": {"availability": "outages", "min_output": "monthly_min"}},
+    ],
+)
+def test_dispatch_config_valid(dispatch):
+    BackcastConfig(dispatch=dispatch)

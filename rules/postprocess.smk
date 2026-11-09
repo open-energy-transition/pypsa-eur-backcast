@@ -254,7 +254,7 @@ rule evaluate_price_backcast:
     input:
         network=backcast_network,
         prices=resources("day_ahead_prices.csv"),
-        area_to_bus=config_provider("backcast", "area_to_bus"),
+        area_to_bus=config_provider("backcast", "areas", "area_to_bus"),
     output:
         metrics=RESULTS + "backcast/price_metrics.csv",
         area_metrics=RESULTS + "backcast/price_metrics_area.csv",
@@ -279,7 +279,7 @@ rule plot_backcast_prices:
         monthly_bias=RESULTS + "backcast/price_monthly_bias.csv",
         metrics=RESULTS + "backcast/price_metrics.csv",
         regions=resources("onshore_regions.geojson"),
-        area_to_bus=config_provider("backcast", "area_to_bus"),
+        area_to_bus=config_provider("backcast", "areas", "area_to_bus"),
         rc="matplotlibrc",
     output:
         backcast_figure_files(BACKCAST_PRICE_FIGURES),
@@ -299,7 +299,7 @@ rule plot_backcast_system:
     input:
         network=backcast_network,
         prices=resources("day_ahead_prices.csv"),
-        area_to_bus=config_provider("backcast", "area_to_bus"),
+        area_to_bus=config_provider("backcast", "areas", "area_to_bus"),
         generation=resources("entsoe_generation_monthly.csv"),
         generation_hourly=resources("entsoe_generation_hourly.csv"),
         exchanges=resources("scheduled_exchanges.csv"),

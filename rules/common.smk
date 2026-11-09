@@ -16,6 +16,7 @@ path = workflow.source_path("../scripts/_helpers.py")
 sys.path.insert(0, os.path.dirname(path))
 
 from scripts._helpers import get_snapshots, load_data_versions
+from scripts.lib.backcast_dispatch import dispatch_carriers
 from scripts.lib.entsoe import read_area_to_bus
 from snakemake.utils import update_config
 

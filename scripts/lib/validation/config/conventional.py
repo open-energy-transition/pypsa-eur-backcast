@@ -84,7 +84,7 @@ class _MarginalCostSpreadConfig(BaseModel):
     )
     reference: Literal["nameplate", "observed"] = Field(
         "nameplate",
-        description="Reference output of the spread. `nameplate` spreads the marginal cost over `p_nom` with `utilisation`. `observed` spreads it over `p_nom` scaled by the observed ENTSO-E peak generation relative to the summed `p_nom` per bidding zone area and carrier group (gas, coal, lignite, oil), capped at 1, with the observed mean relative to the observed peak as utilisation. Generators without observed generation keep `p_nom` and `utilisation`. Requires `backcast.area_to_bus` and the ENTSO-E generation data.",
+        description="Reference output of the spread. `nameplate` spreads the marginal cost over `p_nom` with `utilisation`. `observed` spreads it over `p_nom` scaled by the observed ENTSO-E peak generation relative to the summed `p_nom` per bidding zone area and carrier group (gas, coal, lignite, oil), capped at 1, with the observed mean relative to the observed peak as utilisation. Generators without observed generation keep `p_nom` and `utilisation`. Requires `backcast: areas: area_to_bus` and the ENTSO-E generation data.",
     )
     exclude_areas: list[str] = Field(
         default_factory=list,

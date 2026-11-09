@@ -275,9 +275,9 @@ def test_ntc_requires_fixed_transmission_limit(transmission_limit, valid):
 @pytest.mark.parametrize(
     "backcast",
     [
-        {"nuclear_min_output": True},
-        {"energy_budget_carriers": ["biomass"]},
-        {"external_flows": {"enable": True}},
+        {"dispatch": {"nuclear": {"min_output": "monthly_min"}}},
+        {"dispatch": {"biomass": {"energy": "budget"}}},
+        {"areas": {"external": {"enable": True}}},
     ],
 )
 def test_backcast_observed_year_requires_overnight_foresight(foresight, backcast):

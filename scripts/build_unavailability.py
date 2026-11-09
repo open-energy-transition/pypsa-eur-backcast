@@ -13,7 +13,7 @@ capacity of the matched plants is summed per bus and carrier and divided by
 the capacity of all plants of the bus and carrier, including plants without
 outage data. The second output holds the capacity, the capacity matched to
 production units with outages and their ratio per area and carrier. The
-output is used with ``backcast: unavailability: enable`` in ``compose_network``.
+output is used with ``backcast: dispatch: <carrier>: availability: outages`` in ``compose_network``.
 """
 
 import logging

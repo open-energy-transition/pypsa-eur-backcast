@@ -53,16 +53,16 @@ Each year is an entry `backcast-<year>` in `config/backcast/scenarios.yaml` that
 `pixi run backcast <year>` selects the scenario and sets `planning_horizons` to the year, which a scenario cannot change.
 
 1. Copy the entry of the closest year and replace the year in the snapshots, cutout, `powerplants_filter`, `custom_powerplants`, `estimate_renewable_capacities: year` and `estimate_efficiencies: reference_year`.
-2. Set the bidding zones: before 2021 `backcast: area_to_bus: data/entsoe_area_to_bus-pre2021.csv` and `borders: data/entsoe_borders-pre2021.csv` (Rossano instead of Calabria), from 2021 the defaults.
+2. Set the bidding zones: before 2021 `backcast: areas: area_to_bus: data/entsoe_area_to_bus-pre2021.csv` and `borders: data/entsoe_borders-pre2021.csv` (Rossano instead of Calabria), from 2021 the defaults.
 3. Set the year facts and cite each source in a comment:
-   `exclude_price_areas` (areas without EUR prices or markets), `exclude_generation_areas`,
-   `fixed_border_capacities` (interconnectors commissioned during or after the year),
-   `wind_target_twh` (GB from DUKES minus Northern Ireland wind), `wind_curtailment_twh` (DE_LU from the BNetzA Monitoringbericht),
-   `nuclear_phase_out`, `conventional: gas_price_cap` (ES and PT from 2022-06-15 to 2023-12-31) and `conventional: daily_gas_price` (THE from 2021-10, MIBGAS for ES and PT).
+   `backcast: market_data: prices: exclude_areas` (areas without EUR prices or markets), `market_data: generation: exclude_areas`,
+   `interconnection: fixed` (interconnectors commissioned during or after the year),
+   `renewables: wind: target_twh` (GB from DUKES minus Northern Ireland wind), `renewables: wind: curtailment_twh` (DE_LU from the BNetzA Monitoringbericht),
+   `dispatch: nuclear: phase_out`, `conventional: gas_price_cap` (ES and PT from 2022-06-15 to 2023-12-31) and `conventional: daily_gas_price` (THE from 2021-10, MIBGAS for ES and PT).
    From 2024 set `load: supplement_synthetic: false`, as the synthetic load ends in 2023.
 4. Run `pytest test/test_backcast_configs.py`, which checks every scenario against the schema, its year and the area map, then `pixi run backcast <year>`.
-   Missing ENTSO-E data stops the build with the area or border to add to the exclude lists, `fixed_border_capacities` or `wind_calibration_exclude`.
-   Borders whose capacity source ends within the year can use `backcast: exchange_proxy_fallback`. Wind calibration factors just outside `wind_calibration_factor_bounds` that match the other years (e.g. AT onwind about 2, DK_2 onwind about 0.4) can widen the bounds of that year.
+   Missing ENTSO-E data stops the build with the area or border to add to the exclude lists, `backcast: interconnection: fixed` or `renewables: wind: exclude`.
+   Borders whose capacity source ends within the year can use `backcast: interconnection: proxy: fallback`. Wind calibration factors just outside `renewables: wind: factor_bounds` that match the other years (e.g. AT onwind about 2, DK_2 onwind about 0.4) can widen the bounds of that year.
 
 ## Dashboard
 
@@ -101,7 +101,7 @@ The app opens on `backcast-2023`, the year the refinements were tuned on; the ot
 - The Norwegian zones NO_1, NO_2 and NO_5 separate in 44 % of 2023 model hours (observed 38 %). The hydro inflow split per zone is uncertain.
 - The south-east chain (HU, SK, HR) shares one price more often than the market. The Baltics and other edge zones miss the daily shape.
 - Local-currency prices are not scored yet for BG and RO in 2021 and BG in 2022.
-- The ENTSO-E NTC download is slow (98 border retrievals per year). `backcast.max_capacity_gap_hours: 48` equals the longest 2023 gap.
+- The ENTSO-E NTC download is slow (98 border retrievals per year). `backcast.market_data.capacities.max_gap_hours: 48` equals the longest 2023 gap.
 - Only one Gurobi licence is used, so solves run one after another.
 - Biomass and solar calibration should be re-tested once the level errors (scarcity, hydro water values) are fixed.
 - Fixes meant for upstream PyPSA-Eur (CH load dates, TES ratio constraints, bidding-zone shapes) and a powerplantmatching data issue for Dutch CCGTs are not filed yet.

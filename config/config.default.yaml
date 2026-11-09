@@ -587,97 +587,146 @@ load:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration/#backcast_cf
 backcast:
-  area_to_bus: data/entsoe_area_to_bus.csv
-  borders: data/entsoe_borders.csv
-  exclude_price_areas: []
-  exclude_price_buses: []
-  max_price_gap_hours: 3
-  max_price_gap_hours_by_area: {}
-  max_capacity_gap_hours: 48
-  fixed_border_capacities: {}
-  exchange_proxy_borders: []
-  exchange_proxy_fallback: false
-  exchange_proxy_by_direction_areas: []
-  calibrate_wind: false
-  wind_calibration_exclude: {}
-  wind_calibration_factor_bounds:
-  - 0.5
-  - 2.0
-  wind_curtailment_twh: {}
-  wind_target_twh: {}
-  calibrate_solar: false
-  solar_unpublished: false
-  solar_calibration_exclude: []
-  solar_calibration_factor_bounds:
-  - 0.5
-  - 2.0
-  monthly_nuclear_availability: false
-  monthly_availability_carriers: []
-  monthly_availability_exclude: {}
-  nuclear_area_map: {}
-  nuclear_phase_out: {}
-  nuclear_min_output: false
-  nuclear_load_following: {}
-  energy_budget_carriers: []
-  energy_budget_monthly_ceiling: true
-  energy_budget_eurostat: []
-  energy_budget_fixed: []
-  fuel_price: {}
-  exclude_generation_areas: []
-  hybrid_capacities:
-    enable: false
-    physical_factor: 0.7
-    dc_physical_factor: 0.7
-    sources:
-    - scheduled_exchange
-    areas:
-    - AT
-    - BE
-    - CZ
-    - DE_LU
-    - FR
-    - HR
-    - HU
-    - NL
-    - PL
-    - RO
-    - SI
-    - SK
-  unavailability:
-    enable: false
-    carriers:
-    - CCGT
-    - OCGT
-    - coal
-    - lignite
-    - oil
-    min_coverage:
-      nuclear: 0.9
-  chp_floor:
-    enable: false
-    year:
-    heat_threshold: 15.0
-    hot_water_share: 0.2
-    fuels:
-    - gas
-    - coal
-    - lignite
-    - oil
-    - biomass
-    - waste
-    replace_p_min_pu:
-    - biomass
-    - waste
-  external_flows:
-    enable: false
-    areas:
-    - UA
-    - MD
-    - TR
-    - RU
-    - RU_KGD
-    - BY
-    source: scheduled_exchange_total
+  areas:
+    area_to_bus: data/entsoe_area_to_bus.csv
+    borders: data/entsoe_borders.csv
+    external:
+      enable: false
+      areas:
+      - UA
+      - MD
+      - TR
+      - RU
+      - RU_KGD
+      - BY
+      source: scheduled_exchange_total
+  market_data:
+    prices:
+      exclude_areas: []
+      exclude_buses: []
+      max_gap_hours: 3
+      max_gap_hours_by_area: {}
+    generation:
+      exclude_areas: []
+    capacities:
+      max_gap_hours: 48
+  interconnection:
+    fixed: {}
+    proxy:
+      borders: []
+      fallback: false
+      by_direction_areas: []
+    hybrid:
+      enable: false
+      physical_factor: 0.7
+      dc_physical_factor: 0.7
+      sources:
+      - scheduled_exchange
+      areas:
+      - AT
+      - BE
+      - CZ
+      - DE_LU
+      - FR
+      - HR
+      - HU
+      - NL
+      - PL
+      - RO
+      - SI
+      - SK
+  renewables:
+    wind:
+      calibrate: false
+      exclude: {}
+      factor_bounds:
+      - 0.5
+      - 2.0
+      curtailment_twh: {}
+      target_twh: {}
+    solar:
+      calibrate: false
+      exclude: []
+      factor_bounds:
+      - 0.5
+      - 2.0
+      unpublished: false
+  dispatch:
+    nuclear:
+      availability: none
+      energy: none
+      monthly_ceiling: true
+      exclude_areas: []
+      fuel_price:
+      outage_min_coverage: 0.9
+      min_output: none
+      load_following: {}
+      phase_out: {}
+      area_map: {}
+    CCGT:
+      availability: none
+      energy: none
+      monthly_ceiling: true
+      exclude_areas: []
+      fuel_price:
+      outage_min_coverage: 0.0
+    OCGT:
+      availability: none
+      energy: none
+      monthly_ceiling: true
+      exclude_areas: []
+      fuel_price:
+      outage_min_coverage: 0.0
+    coal:
+      availability: none
+      energy: none
+      monthly_ceiling: true
+      exclude_areas: []
+      fuel_price:
+      outage_min_coverage: 0.0
+    lignite:
+      availability: none
+      energy: none
+      monthly_ceiling: true
+      exclude_areas: []
+      fuel_price:
+      outage_min_coverage: 0.0
+    oil:
+      availability: none
+      energy: none
+      monthly_ceiling: true
+      exclude_areas: []
+      fuel_price:
+      outage_min_coverage: 0.0
+    biomass:
+      availability: none
+      energy: none
+      monthly_ceiling: true
+      exclude_areas: []
+      fuel_price:
+      outage_min_coverage: 0.0
+    waste:
+      availability: none
+      energy: none
+      monthly_ceiling: true
+      exclude_areas: []
+      fuel_price:
+      outage_min_coverage: 0.0
+    chp_floor:
+      enable: false
+      year:
+      heat_threshold: 15.0
+      hot_water_share: 0.2
+      fuels:
+      - gas
+      - coal
+      - lignite
+      - oil
+      - biomass
+      - waste
+      replace_p_min_pu:
+      - biomass
+      - waste
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration/#pypsa_eur_cf
 pypsa_eur:

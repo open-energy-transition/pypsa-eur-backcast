@@ -61,9 +61,9 @@ def raise_to_physical(
     The lower bound is the sum of `physical_factor` times ``s_nom`` of the
     lines and `dc_physical_factor` times ``p_nom`` of the DC links between the
     two buses, whose nominal capacities are kept by
-    ``backcast: fixed_border_capacities: physical``.
+    ``backcast: interconnection: fixed: physical``.
     """
-    assert_known_areas(areas, area_to_bus, "backcast: hybrid_capacities: areas")
+    assert_known_areas(areas, area_to_bus, "backcast: interconnection: hybrid: areas")
     branches = inter_zone_branches(n, area_to_bus)
     factors = {"Line": physical_factor, "Link": dc_physical_factor}
     factor = branches.index.get_level_values("component").map(factors)
@@ -170,7 +170,7 @@ def external_net_imports(
     absent = sorted(set(series) - set(data.columns))
     assert not absent, (
         f"Retrieved cross-border data lacks {absent}, retrieve it again with the "
-        "area in `backcast: external_flows: areas`."
+        "area in `backcast: areas: external: areas`."
     )
     hourly = {
         column: data[column]
@@ -218,7 +218,7 @@ def add_external_flows(
     modelled = area_to_bus[area_to_bus.index.isin(n.buses.index)]
     overlap = sorted(set(borders.external_area) & set(modelled))
     assert not overlap, (
-        f"External areas are modelled as buses, remove them from `backcast: external_flows: areas`: {overlap}"
+        f"External areas are modelled as buses, remove them from `backcast: areas: external: areas`: {overlap}"
     )
     load = n.loads_t.p_set.sum().groupby(n.loads.bus).sum().reindex(modelled.index)
     main_bus = load.fillna(0.0).groupby(modelled).idxmax()

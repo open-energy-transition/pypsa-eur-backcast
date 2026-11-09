@@ -343,7 +343,7 @@ class _HydroConfig(BaseModel):
     )
     inflow_source: Literal["eia", "entsoe_balance"] = Field(
         "eia",
-        description="Source of the run-of-river and reservoir inflow. 'eia' scales the runoff per country to the annual EIA hydro generation and splits it onto the plants by `p_nom`. 'entsoe_balance' takes the inflow per ENTSO-E bidding zone area in `backcast: area_to_bus` from the hourly actual generation of run-of-river and reservoir hydro plus the weekly change of the reservoir filling, sets the reservoir energy capacity to the maximum observed filling and the reservoir dispatch efficiency to 1. Areas without published generation keep the EIA based inflow.",
+        description="Source of the run-of-river and reservoir inflow. 'eia' scales the runoff per country to the annual EIA hydro generation and splits it onto the plants by `p_nom`. 'entsoe_balance' takes the inflow per ENTSO-E bidding zone area in `backcast: areas: area_to_bus` from the hourly actual generation of run-of-river and reservoir hydro plus the weekly change of the reservoir filling, sets the reservoir energy capacity to the maximum observed filling and the reservoir dispatch efficiency to 1. Areas without published generation keep the EIA based inflow.",
     )
     entsoe_balance: _HydroEntsoeBalanceConfig = Field(
         default_factory=_HydroEntsoeBalanceConfig,
