@@ -8,12 +8,12 @@ Backcast configuration.
 See docs in https://pypsa-eur.readthedocs.io/en/latest/configuration/#backcast_cf
 """
 
-import datetime
 from typing import Annotated, Literal
 
 from pydantic import Field, PositiveFloat, field_validator, model_validator
 
 from scripts.lib.validation.config._base import ConfigModel
+from scripts.lib.validation.config.backcast_dispatch import DispatchConfig
 
 MAX_INTERPOLATE_PRICE_GAP_HOURS = 3
 
@@ -21,11 +21,11 @@ GapHours = Annotated[int, Field(ge=MAX_INTERPOLATE_PRICE_GAP_HOURS)]
 
 
 class HybridCapacitiesConfig(ConfigModel):
-    """Configuration for `backcast.hybrid_capacities` settings."""
+    """Configuration for `backcast.interconnection.hybrid` settings."""
 
     enable: bool = Field(
         False,
-        description="Raise the hourly capacity of border directions whose source is in `sources` and that connect two of the `areas` to at least `physical_factor` times `s_nom` of the lines plus `dc_physical_factor` times `p_nom` of the DC links between the two buses (the physical capacity, as with `fixed_border_capacities: physical`), e.g. for the monthly maximum of scheduled exchanges in the flow-based Core region, which underestimates the available capacity. Requires `electricity: cross_border_capacities: ntc`.",
+        description="Raise the hourly capacity of border directions whose source is in `sources` and that connect two of the `areas` to at least `physical_factor` times `s_nom` of the lines plus `dc_physical_factor` times `p_nom` of the DC links between the two buses (the physical capacity, as with `interconnection: fixed: physical`), e.g. for the monthly maximum of scheduled exchanges in the flow-based Core region, which underestimates the available capacity. Requires `electricity: cross_border_capacities: ntc`.",
     )
     physical_factor: Annotated[float, Field(gt=0)] = Field(
         0.7,
@@ -60,57 +60,8 @@ class HybridCapacitiesConfig(ConfigModel):
     )
 
 
-class UnavailabilityConfig(ConfigModel):
-    """Configuration for `backcast.unavailability` settings."""
-
-    enable: bool = Field(
-        False,
-        description="Set the availability (`p_max_pu`) of the generators of the `carriers` per bus to one minus the hourly unavailable share of their capacity from the unavailability of generation and production units published on the ENTSO-E Transparency Platform (planned and forced outages). The production units are matched to powerplantmatching by EIC code, nuclear units without one by name and capacity. The availability replaces `monthly_nuclear_availability` in areas with enough nuclear outage data (`min_coverage`). Nuclear generators of areas in `nuclear_phase_out` get zero availability after their last operating date. Requires `foresight: overnight`.",
-    )
-    carriers: list[str] = Field(
-        default_factory=lambda: ["CCGT", "OCGT", "coal", "lignite", "oil"],
-        description="Generator carriers whose availability is set from the outage data. Nuclear is left out by default, since outages miss units closed during the year, capacity without reported outages and modulation, so its availability is overstated.",
-    )
-    min_coverage: dict[str, Annotated[float, Field(ge=0, le=1)]] = Field(
-        default_factory=lambda: {"nuclear": 0.9},
-        description="Minimum share of the capacity of a carrier in an ENTSO-E area matched to production units with outage data, below which the generators keep their availability, e.g. the monthly nuclear availability. Zero for carriers not given.",
-    )
-
-
-ChpFuel = Literal["gas", "coal", "lignite", "oil", "biomass", "waste"]
-
-
-class ChpFloorConfig(ConfigModel):
-    """Configuration for `backcast.chp_floor` settings."""
-
-    enable: bool = Field(
-        False,
-        description="Add an hourly heat-led minimum output (`p_min_pu`) to the conventional generators of each country and fuel group. The annual floor energy is the minimum of the back-pressure ratio `c_b` of the CHP technology in the cost data times the main-activity CHP heat output and the main-activity CHP electricity output in Eurostat `nrg_bal_peh` for the snapshot year or `year`. It follows a daily heat demand profile from the cutout temperature, weighted by the urban population.",
-    )
-    year: int | None = Field(
-        None,
-        description="Year of the Eurostat `nrg_bal_peh` CHP output that sets the annual floor energy. Defaults to the snapshot year. Set it for snapshot years Eurostat does not cover yet; the heat profile still follows the snapshot weather.",
-    )
-    heat_threshold: float = Field(
-        15.0,
-        description="Daily mean temperature in degree Celsius below which space heating demand arises (heating degree days).",
-    )
-    hot_water_share: Annotated[float, Field(ge=0, lt=1)] = Field(
-        0.2,
-        description="Share of the annual heat demand that is flat over the year (hot water and network losses). Eurostat `nrg_d_hhq` gives a water heating share of household derived heat of 0.23 (2019) and 0.25 (2023) for the EU27, with a country median of 0.17.",
-    )
-    fuels: list[ChpFuel] = Field(
-        default_factory=lambda: ["gas", "coal", "lignite", "oil", "biomass", "waste"],
-        description="Fuel groups that receive the floor: gas (CCGT, OCGT), coal, lignite, oil, biomass and waste. Oil counts marketed oil products but not refinery gas and other oil products, which fire refinery-sited plants raising process steam that does not follow heating degree days.",
-    )
-    replace_p_min_pu: list[ChpFuel] = Field(
-        default_factory=lambda: ["biomass", "waste"],
-        description="Fuel groups whose flat `conventional: <carrier>: p_min_pu` is replaced by the floor in countries with a floor. Countries without Eurostat data keep the flat value.",
-    )
-
-
-class ExternalFlowsConfig(ConfigModel):
-    """Configuration for `backcast.external_flows` settings."""
+class ExternalConfig(ConfigModel):
+    """Configuration for `backcast.areas.external` settings."""
 
     enable: bool = Field(
         False,
@@ -126,8 +77,27 @@ class ExternalFlowsConfig(ConfigModel):
     )
 
 
-class BackcastConfig(ConfigModel):
-    """Configuration for `backcast` settings."""
+def check_borders(value: list[str]) -> None:
+    """Require borders as two alphabetically sorted areas `AREA0-AREA1`."""
+    invalid = [
+        k
+        for k in value
+        if len(k.split("-")) != 2 or k.split("-") != sorted(k.split("-"))
+    ]
+    assert not invalid, f"Borders must be given as sorted `AREA0-AREA1`: {invalid}"
+
+
+def check_ascending(value: list[float]) -> list[float]:
+    """Require the lower bound not to exceed the upper bound."""
+    assert value[0] <= value[1], f"Calibration factor bounds must be ascending: {value}"
+    return value
+
+
+FactorBounds = Annotated[list[PositiveFloat], Field(min_length=2, max_length=2)]
+
+
+class AreasConfig(ConfigModel):
+    """Configuration for `backcast.areas` settings."""
 
     area_to_bus: str = Field(
         "data/entsoe_area_to_bus.csv",
@@ -137,253 +107,233 @@ class BackcastConfig(ConfigModel):
         "data/entsoe_borders.csv",
         description="CSV file with the ENTSO-E bidding zone borders (`area0`, `area1`) whose cross-border capacities are retrieved, used with `electricity: cross_border_capacities: ntc`, e.g. `data/entsoe_borders-pre2021.csv` for the Italian bidding zones before 2021.",
     )
-    exclude_price_areas: list[str] = Field(
+    external: ExternalConfig = Field(
+        default_factory=ExternalConfig,
+        description="Fixed hourly flows to ENTSO-E areas outside the model.",
+    )
+
+
+class PricesConfig(ConfigModel):
+    """Configuration for `backcast.market_data.prices` settings."""
+
+    exclude_areas: list[str] = Field(
         default_factory=list,
         description="ENTSO-E bidding zone areas without published day-ahead prices for the whole snapshot range, e.g. `GB` after 2020, `BA` and `XK`, or `AL`, `ME` and `MK` whose markets started during 2023. Buses mapped to these areas in `data/entsoe_area_to_bus.csv` are omitted from the observed day-ahead prices.",
     )
-    exclude_price_buses: list[str] = Field(
+    exclude_buses: list[str] = Field(
         default_factory=list,
         description="Buses omitted from the observed day-ahead prices although their ENTSO-E area publishes prices, e.g. `FR15` (Corsica), which is not part of the French day-ahead market.",
     )
-    max_price_gap_hours: GapHours = Field(
+    max_gap_hours: GapHours = Field(
         MAX_INTERPOLATE_PRICE_GAP_HOURS,
         description=f"Longest gap in hours of observed day-ahead prices that is tolerated. Gaps of up to {MAX_INTERPOLATE_PRICE_GAP_HOURS} hours are interpolated, longer gaps up to this limit are kept as missing values, even longer gaps raise an error.",
     )
-    max_price_gap_hours_by_area: dict[str, GapHours] = Field(
+    max_gap_hours_by_area: dict[str, GapHours] = Field(
         default_factory=dict,
-        description="Longest tolerated gap in hours of observed day-ahead prices per ENTSO-E area, overriding `max_price_gap_hours`, e.g. `IE_SEM: 25` as the ENTSO-E Transparency Platform publishes no prices for the 25 hour delivery day at the end of daylight saving time in 2022 and 2023.",
+        description="Longest tolerated gap in hours of observed day-ahead prices per ENTSO-E area, overriding `market_data: prices: max_gap_hours`, e.g. `IE_SEM: 25` as the ENTSO-E Transparency Platform publishes no prices for the 25 hour delivery day at the end of daylight saving time in 2022 and 2023.",
     )
-    max_capacity_gap_hours: Annotated[int, Field(ge=0)] = Field(
+
+
+class GenerationConfig(ConfigModel):
+    """Configuration for `backcast.market_data.generation` settings."""
+
+    exclude_areas: list[str] = Field(
+        default_factory=list,
+        description="ENTSO-E areas without actual generation published on the ENTSO-E Transparency Platform for the snapshot years, e.g. `GB` after 2020. Their actual generation is not retrieved and their generators keep their availability with `renewables: wind: calibrate`, unless given in `renewables: wind: target_twh`, and `dispatch: <carrier>: availability: monthly`. Other areas without published data raise an error during retrieval.",
+    )
+
+
+class CapacitiesConfig(ConfigModel):
+    """Configuration for `backcast.market_data.capacities` settings."""
+
+    max_gap_hours: Annotated[int, Field(ge=0)] = Field(
         48,
         description="Longest gap in hours of the ENTSO-E cross-border capacity source of a border direction that is interpolated, used with `electricity: cross_border_capacities: ntc`. Longer gaps raise an error. The default covers up to two missing delivery days, e.g. of the offered capacities on the Nordic and Baltic borders in 2023.",
     )
-    fixed_border_capacities: dict[
-        str, Annotated[float, Field(ge=0)] | Literal["physical"]
-    ] = Field(
-        default_factory=dict,
-        description="Constant capacity in MW per direction for bidding zone borders without published ENTSO-E capacities, used with `electricity: cross_border_capacities: ntc`. Keys are alphabetically sorted ENTSO-E area pairs like `DK_1-GB`; the value `physical` keeps the physical transmission capacity of the network and `0` disconnects the areas, e.g. for interconnectors commissioned after the snapshots or connections without a market border created by the clustering.",
+
+
+class MarketDataConfig(ConfigModel):
+    """Configuration for `backcast.market_data` settings."""
+
+    prices: PricesConfig = Field(
+        default_factory=PricesConfig,
+        description="Observed day-ahead prices of the ENTSO-E Transparency Platform.",
+    )
+    generation: GenerationConfig = Field(
+        default_factory=GenerationConfig,
+        description="Actual generation of the ENTSO-E Transparency Platform.",
+    )
+    capacities: CapacitiesConfig = Field(
+        default_factory=CapacitiesConfig,
+        description="Cross-border capacities of the ENTSO-E Transparency Platform.",
     )
 
-    exchange_proxy_borders: list[str] = Field(
+
+class ProxyConfig(ConfigModel):
+    """Configuration for `backcast.interconnection.proxy` settings."""
+
+    borders: list[str] = Field(
         default_factory=list,
-        description="Bidding zone borders that use the monthly maximum of the day-ahead scheduled commercial exchanges over both directions as capacity even if ENTSO-E publishes capacities, used with `electricity: cross_border_capacities: ntc`. Given as alphabetically sorted ENTSO-E area pairs like `BE-NL`, e.g. for borders within the flow-based Core region whose published net transfer capacities are outdated. `fixed_border_capacities` take precedence.",
+        description="Bidding zone borders that use the monthly maximum of the day-ahead scheduled commercial exchanges over both directions as capacity even if ENTSO-E publishes capacities, used with `electricity: cross_border_capacities: ntc`. Given as alphabetically sorted ENTSO-E area pairs like `BE-NL`, e.g. for borders within the flow-based Core region whose published net transfer capacities are outdated. `interconnection: fixed` take precedence.",
     )
-    exchange_proxy_fallback: bool = Field(
+    fallback: bool = Field(
         False,
-        description="Fill gaps longer than `max_capacity_gap_hours` in the ENTSO-E capacity source of a border direction with the monthly maximum of the day-ahead scheduled commercial exchanges over both directions instead of raising an error, used with `electricity: cross_border_capacities: ntc`. The source of such directions is recorded as `<source>+scheduled_exchange`. E.g. for the Nordic borders, whose offered capacities end with the start of flow-based market coupling on 2024-10-29.",
+        description="Fill gaps longer than `market_data: capacities: max_gap_hours` in the ENTSO-E capacity source of a border direction with the monthly maximum of the day-ahead scheduled commercial exchanges over both directions instead of raising an error, used with `electricity: cross_border_capacities: ntc`. The source of such directions is recorded as `<source>+scheduled_exchange`. E.g. for the Nordic borders, whose offered capacities end with the start of flow-based market coupling on 2024-10-29.",
     )
-    exchange_proxy_by_direction_areas: list[str] = Field(
+    by_direction_areas: list[str] = Field(
         default_factory=list,
         description="ENTSO-E areas whose borders with each other use the monthly maximum of the day-ahead scheduled commercial exchanges per direction as exchange proxy, instead of the maximum over both directions. As the exchanges are netted per hour, the proxy of a rarely used direction is low. E.g. for the Nordic flow-based region, where the maximum over both directions gives rarely used directions the capacity of the busy one.",
     )
 
-    calibrate_wind: bool = Field(
-        False,
-        description="Scale the onshore and offshore wind availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual generation reported by the ENTSO-E Transparency Platform plus `wind_curtailment_twh`. Only months with actual generation of the carrier are compared. One factor per area and carrier, `p_max_pu` is clipped at 1. Wind carriers with capacity but without actual generation in an area that publishes generation, e.g. offshore wind in `IE_SEM`, get zero availability. Areas without published generation are scaled to `wind_target_twh` or keep their availability, as do carriers excluded in `wind_calibration_exclude`. Requires `foresight: overnight`.",
-    )
-    wind_calibration_exclude: dict[str, list[Literal["onwind", "offwind"]]] = Field(
+    @field_validator("borders")
+    @classmethod
+    def check_border_keys(cls, value: list[str]) -> list[str]:
+        """Require borders as two alphabetically sorted areas `AREA0-AREA1`."""
+        check_borders(value)
+        return value
+
+
+class InterconnectionConfig(ConfigModel):
+    """Configuration for `backcast.interconnection` settings, with precedence fixed over proxy over hybrid."""
+
+    fixed: dict[str, Annotated[float, Field(ge=0)] | Literal["physical"]] = Field(
         default_factory=dict,
-        description="Wind carriers per ENTSO-E area whose availability is not calibrated with `calibrate_wind`, e.g. `NL: [onwind]`, whose reported onshore wind generation covers only part of the fleet. Wind curtailment cannot be given for these areas.",
+        description="Constant capacity in MW per direction for bidding zone borders without published ENTSO-E capacities, used with `electricity: cross_border_capacities: ntc`. Keys are alphabetically sorted ENTSO-E area pairs like `DK_1-GB`; the value `physical` keeps the physical transmission capacity of the network and `0` disconnects the areas, e.g. for interconnectors commissioned after the snapshots or connections without a market border created by the clustering.",
     )
-    wind_calibration_factor_bounds: Annotated[
-        list[PositiveFloat], Field(min_length=2, max_length=2)
-    ] = Field(
+    proxy: ProxyConfig = Field(
+        default_factory=ProxyConfig,
+        description="Monthly maximum of the day-ahead scheduled commercial exchanges as cross-border capacity.",
+    )
+    hybrid: HybridCapacitiesConfig = Field(
+        default_factory=HybridCapacitiesConfig,
+        description="Raise cross-border capacities from proxy sources to a share of the physical transmission capacity, used with `electricity: cross_border_capacities: ntc`.",
+    )
+
+    @field_validator("fixed")
+    @classmethod
+    def check_border_keys(cls, value: dict[str, float | str]) -> dict[str, float | str]:
+        """Require borders as two alphabetically sorted areas `AREA0-AREA1`."""
+        check_borders(list(value))
+        return value
+
+
+class WindConfig(ConfigModel):
+    """Configuration for `backcast.renewables.wind` settings."""
+
+    calibrate: bool = Field(
+        False,
+        description="Scale the onshore and offshore wind availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual generation reported by the ENTSO-E Transparency Platform plus `renewables: wind: curtailment_twh`. Only months with actual generation of the carrier are compared. One factor per area and carrier, `p_max_pu` is clipped at 1. Wind carriers with capacity but without actual generation in an area that publishes generation, e.g. offshore wind in `IE_SEM`, get zero availability. Areas without published generation are scaled to `renewables: wind: target_twh` or keep their availability, as do carriers excluded in `renewables: wind: exclude`. Requires `foresight: overnight`.",
+    )
+    exclude: dict[str, list[Literal["onwind", "offwind"]]] = Field(
+        default_factory=dict,
+        description="Wind carriers per ENTSO-E area whose availability is not calibrated with `renewables: wind: calibrate`, e.g. `NL: [onwind]`, whose reported onshore wind generation covers only part of the fleet. Wind curtailment cannot be given for these areas.",
+    )
+    factor_bounds: FactorBounds = Field(
         default_factory=lambda: [0.5, 2.0],
-        description="Lower and upper bound of the wind calibration factors of `calibrate_wind`. A factor outside the bounds raises an error naming the area and carrier, which must then be added to `wind_calibration_exclude` or the bounds widened.",
+        description="Lower and upper bound of the wind calibration factors of `renewables: wind: calibrate`. A factor outside the bounds raises an error naming the area and carrier, which must then be added to `renewables: wind: exclude` or the bounds widened.",
     )
-    wind_curtailment_twh: dict[
+    curtailment_twh: dict[
         str,
         Annotated[float, Field(ge=0)]
         | dict[Literal["onwind", "offwind"], Annotated[float, Field(ge=0)]],
     ] = Field(
         default_factory=dict,
-        description="Curtailed wind energy in TWh per ENTSO-E area added to the actual generation with `calibrate_wind`, either per carrier like `DE_LU: {onwind: 6, offwind: 4}` or as a total split between onshore and offshore wind by their actual generation. The ENTSO-E actual generation is reported after curtailment, e.g. after redispatch in `DE_LU`.",
+        description="Curtailed wind energy in TWh per ENTSO-E area added to the actual generation with `renewables: wind: calibrate`, either per carrier like `DE_LU: {onwind: 6, offwind: 4}` or as a total split between onshore and offshore wind by their actual generation. The ENTSO-E actual generation is reported after curtailment, e.g. after redispatch in `DE_LU`.",
     )
-    wind_target_twh: dict[
+    target_twh: dict[
         str, dict[Literal["onwind", "offwind"], Annotated[float, Field(ge=0)]]
     ] = Field(
         default_factory=dict,
-        description="Wind energy in TWh per carrier over all snapshots for ENTSO-E areas without published actual generation (`exclude_generation_areas`), to which `calibrate_wind` scales their availability instead of the ENTSO-E data, e.g. `GB: {onwind: 32.5, offwind: 49.6}` from DESNZ Energy Trends for 2023. Not allowed for areas with published generation or carriers in `wind_calibration_exclude`.",
-    )
-    calibrate_solar: bool = Field(
-        False,
-        description="Scale the solar availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual solar generation reported by the ENTSO-E Transparency Platform, i.e. the grid-fed output on the same basis as the ENTSO-E load. Only months with actual solar generation are compared. One factor per area, `p_max_pu` is clipped at 1. Areas that publish generation but no solar get zero solar availability. Areas in `solar_calibration_exclude` and in `exclude_generation_areas` are not calibrated; the self-consumed share of their country in `data/solar_self_consumption.csv` is removed from their availability instead, countries without a share keep it. With `solar_unpublished`, calibrated areas add the solar generation that ENTSO-E does not publish to their target. Requires `foresight: overnight`.",
-    )
-    solar_unpublished: bool = Field(
-        False,
-        description="Add the grid-fed solar generation in TWh that ENTSO-E does not publish but that serves the ENTSO-E load, per area from `data/solar_unpublished.csv` for the snapshot year, to the targets of `calibrate_solar`. The file must have rows for the snapshot year. Requires `calibrate_solar`.",
-    )
-    solar_calibration_exclude: list[str] = Field(
-        default_factory=list,
-        description="ENTSO-E areas whose solar availability is not calibrated with `calibrate_solar` because ENTSO-E reports only part of their solar generation, e.g. `NL`. Their self-consumed share is removed from the availability instead.",
-    )
-    solar_calibration_factor_bounds: Annotated[
-        list[PositiveFloat], Field(min_length=2, max_length=2)
-    ] = Field(
-        default_factory=lambda: [0.5, 2.0],
-        description="Lower and upper bound of the solar calibration factors of `calibrate_solar`. A factor outside the bounds raises an error naming the area, which must then be added to `solar_calibration_exclude` or the bounds widened.",
-    )
-    monthly_nuclear_availability: bool = Field(
-        False,
-        description="Set the nuclear availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` and month to the actual monthly capacity factor, i.e. the actual generation divided by the hours with data and the nuclear capacity of the area, clipped to [0, 1]. After the last operating date in `nuclear_phase_out` the availability is zero. Every month before it must have actual generation, otherwise an error is raised. Areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
-    )
-    monthly_availability_carriers: list[str] = Field(
-        default_factory=list,
-        description="Further generator carriers whose availability is set per ENTSO-E area and month to the actual capacity factor like `monthly_nuclear_availability`, e.g. `[lignite, biomass, waste]` when these run at full availability in the model but not in reality. Generators of areas without published generation of the carrier, e.g. biomass in `SE_3`, and areas in `exclude_generation_areas` keep their availability. Requires `foresight: overnight`.",
-    )
-    monthly_availability_exclude: dict[str, list[str]] = Field(
-        default_factory=dict,
-        description="ENTSO-E areas per carrier of `monthly_availability_carriers` or `energy_budget_carriers` kept at their availability instead of the monthly capacity factor or the energy budget, e.g. `{coal: [PL]}` for a fleet used flexibly as a swing exporter, whose monthly mean capacity factor would wrongly flatten its hourly dispatch and distort the prices of its trading partners.",
-    )
-    nuclear_area_map: dict[str, str] = Field(
-        default_factory=dict,
-        description="ENTSO-E areas whose nuclear generators are calibrated with `monthly_nuclear_availability` from the actual generation of another area, pooling their capacity, e.g. `SE_4: SE_3` when nuclear generators located in the clustered `SE04` region report their generation to `SE_3`.",
-    )
-    nuclear_phase_out: dict[str, str] = Field(
-        default_factory=dict,
-        description='Last operating date of the nuclear generators per ENTSO-E area with `monthly_nuclear_availability`, after which their availability is zero, given as quoted ISO date, e.g. `DE_LU: "2023-04-15"` for the German nuclear exit.',
-    )
-    nuclear_min_output: bool = Field(
-        False,
-        description="Set the nuclear minimum output (`p_min_pu`) per ENTSO-E area and month to the lowest hourly actual generation of the month over the nuclear capacity of the area, clipped to [0, 1], and zero in months without actual generation. Areas without actual nuclear generation keep `conventional: nuclear: p_min_pu`, areas in `nuclear_load_following` get their share of the availability instead. Generators of the keys of `nuclear_area_map` are pooled with the area they map to.",
-    )
-    nuclear_load_following: dict[str, Annotated[float, Field(gt=0, le=1)]] = Field(
-        default_factory=dict,
-        description="Minimum output of the nuclear generators per ENTSO-E area as share of their availability (`p_max_pu`) with `nuclear_min_output`, for fleets that follow the load instead of running at their observed minimum, e.g. `FR: 0.2`.",
-    )
-    energy_budget_carriers: list[str] = Field(
-        default_factory=list,
-        description="Generator carriers whose energy over the snapshots (`e_sum_max`) per ENTSO-E area is the actual generation of the area, scaled per month from the hours with data to all hours (every month needs data), raised to the Eurostat value for carriers in `energy_budget_eurostat`, shared by `p_nom` and raised to the must-run energy of `p_min_pu`. With `energy_budget_monthly_ceiling`, their availability (`p_max_pu`) is clipped to the peak hourly actual generation of the month over the capacity of the area. Carriers in `energy_budget_fixed` follow the hourly actual generation instead. Areas in `monthly_availability_exclude` of the carrier and areas without actual generation of the carrier keep their limits. Requires `foresight: overnight`.",
-    )
-    energy_budget_monthly_ceiling: bool = Field(
-        True,
-        description="Clip the availability (`p_max_pu`) of the `energy_budget_carriers` per ENTSO-E area to the peak hourly actual generation of the month over the capacity of the area. Carriers in `energy_budget_fixed` are not clipped.",
-    )
-    energy_budget_eurostat: list[Literal["biomass"]] = Field(
-        default_factory=list,
-        description="Carriers of `energy_budget_carriers` whose energy per ENTSO-E area is the larger of the actual generation and the Eurostat `nrg_bal_peh` gross electricity production of all producers including autoproducers in the snapshot year (biomass: bioenergy `BIOE` minus renewable municipal waste `W6210`), shared by `p_nom` over the generators of the carrier in each country. ENTSO-E misses most autoproducer output, e.g. FI pulp mills.",
-    )
-    energy_budget_fixed: list[str] = Field(
-        default_factory=list,
-        description="Carriers of `energy_budget_carriers` whose output per ENTSO-E area is fixed (`p_min_pu` = `p_max_pu`) to the hourly actual generation instead of capped by `e_sum_max`, for price-taking heat-led fleets such as biomass CHP whose binding annual cap would set the price. The hourly actual generation is scaled by the energy of the area over the actual energy (the Eurostat uplift of `energy_budget_eurostat`, else 1), shared by `p_nom` and capped at the capacity of the area. Hours without actual generation keep their limits.",
-    )
-    fuel_price: dict[str, Annotated[float, Field(ge=0)]] = Field(
-        default_factory=dict,
-        description="Fuel cost in EUR/MWh_th per technology replacing the cost data, e.g. `biomass: 30.68`. With `conventional: dynamic_fuel_price`, it applies to the carriers without monthly fuel prices.",
-    )
-    exclude_generation_areas: list[str] = Field(
-        default_factory=list,
-        description="ENTSO-E areas without actual generation published on the ENTSO-E Transparency Platform for the snapshot years, e.g. `GB` after 2020. Their actual generation is not retrieved and their generators keep their availability with `calibrate_wind`, unless given in `wind_target_twh`, and `monthly_nuclear_availability`. Other areas without published data raise an error during retrieval.",
-    )
-    hybrid_capacities: HybridCapacitiesConfig = Field(
-        default_factory=HybridCapacitiesConfig,
-        description="Raise cross-border capacities from proxy sources to a share of the physical transmission capacity, used with `electricity: cross_border_capacities: ntc`.",
-    )
-    unavailability: UnavailabilityConfig = Field(
-        default_factory=UnavailabilityConfig,
-        description="Thermal availability from the ENTSO-E unavailability of generation and production units.",
-    )
-    chp_floor: ChpFloorConfig = Field(
-        default_factory=ChpFloorConfig,
-        description="Heat-led minimum output of combined heat and power plants.",
-    )
-    external_flows: ExternalFlowsConfig = Field(
-        default_factory=ExternalFlowsConfig,
-        description="Fixed hourly flows to ENTSO-E areas outside the model.",
+        description="Wind energy in TWh per carrier over all snapshots for ENTSO-E areas without published actual generation (`market_data: generation: exclude_areas`), to which `renewables: wind: calibrate` scales their availability instead of the ENTSO-E data, e.g. `GB: {onwind: 32.5, offwind: 49.6}` from DESNZ Energy Trends for 2023. Not allowed for areas with published generation or carriers in `renewables: wind: exclude`.",
     )
 
-    @field_validator("fixed_border_capacities", "exchange_proxy_borders")
-    @classmethod
-    def check_border_keys(
-        cls, value: dict[str, float | str] | list[str]
-    ) -> dict[str, float | str] | list[str]:
-        """Require borders as two alphabetically sorted areas `AREA0-AREA1`."""
-        invalid = [
-            k
-            for k in value
-            if len(k.split("-")) != 2 or k.split("-") != sorted(k.split("-"))
-        ]
-        assert not invalid, f"Borders must be given as sorted `AREA0-AREA1`: {invalid}"
-        return value
-
-    @field_validator("nuclear_phase_out")
-    @classmethod
-    def check_phase_out_dates(cls, value: dict[str, str]) -> dict[str, str]:
-        """Require ISO dates like `2023-04-15`."""
-        for date in value.values():
-            datetime.date.fromisoformat(date)
-        return value
-
-    @field_validator(
-        "wind_calibration_factor_bounds", "solar_calibration_factor_bounds"
-    )
+    @field_validator("factor_bounds")
     @classmethod
     def check_factor_bounds(cls, value: list[float]) -> list[float]:
         """Require the lower bound not to exceed the upper bound."""
-        assert value[0] <= value[1], (
-            f"Calibration factor bounds must be ascending: {value}"
+        return check_ascending(value)
+
+
+class SolarConfig(ConfigModel):
+    """Configuration for `backcast.renewables.solar` settings."""
+
+    calibrate: bool = Field(
+        False,
+        description="Scale the solar availability (`p_max_pu`) per ENTSO-E area in `data/entsoe_area_to_bus.csv` so that the available energy matches the actual solar generation reported by the ENTSO-E Transparency Platform, i.e. the grid-fed output on the same basis as the ENTSO-E load. Only months with actual solar generation are compared. One factor per area, `p_max_pu` is clipped at 1. Areas that publish generation but no solar get zero solar availability. Areas in `renewables: solar: exclude` and in `market_data: generation: exclude_areas` are not calibrated; the self-consumed share of their country in `data/solar_self_consumption.csv` is removed from their availability instead, countries without a share keep it. With `renewables: solar: unpublished`, calibrated areas add the solar generation that ENTSO-E does not publish to their target. Requires `foresight: overnight`.",
+    )
+    exclude: list[str] = Field(
+        default_factory=list,
+        description="ENTSO-E areas whose solar availability is not calibrated with `renewables: solar: calibrate` because ENTSO-E reports only part of their solar generation, e.g. `NL`. Their self-consumed share is removed from the availability instead.",
+    )
+    factor_bounds: FactorBounds = Field(
+        default_factory=lambda: [0.5, 2.0],
+        description="Lower and upper bound of the solar calibration factors of `renewables: solar: calibrate`. A factor outside the bounds raises an error naming the area, which must then be added to `renewables: solar: exclude` or the bounds widened.",
+    )
+    unpublished: bool = Field(
+        False,
+        description="Add the grid-fed solar generation in TWh that ENTSO-E does not publish but that serves the ENTSO-E load, per area from `data/solar_unpublished.csv` for the snapshot year, to the targets of `renewables: solar: calibrate`. The file must have rows for the snapshot year. Requires `renewables: solar: calibrate`.",
+    )
+
+    @field_validator("factor_bounds")
+    @classmethod
+    def check_factor_bounds(cls, value: list[float]) -> list[float]:
+        """Require the lower bound not to exceed the upper bound."""
+        return check_ascending(value)
+
+    @model_validator(mode="after")
+    def check_unpublished(self) -> "SolarConfig":
+        """Require the calibration for the unpublished solar generation."""
+        assert self.calibrate or not self.unpublished, (
+            "backcast: renewables: solar: unpublished requires calibrate."
         )
-        return value
+        return self
+
+
+class RenewablesConfig(ConfigModel):
+    """Configuration for `backcast.renewables` settings."""
+
+    wind: WindConfig = Field(
+        default_factory=WindConfig,
+        description="Calibration of the onshore and offshore wind availability.",
+    )
+    solar: SolarConfig = Field(
+        default_factory=SolarConfig,
+        description="Calibration of the solar availability.",
+    )
+
+
+class BackcastConfig(ConfigModel):
+    """Configuration for `backcast` settings."""
+
+    areas: AreasConfig = Field(
+        default_factory=AreasConfig,
+        description="ENTSO-E bidding zone areas, their borders and the areas outside the model.",
+    )
+    market_data: MarketDataConfig = Field(
+        default_factory=MarketDataConfig,
+        description="Observed market data of the ENTSO-E Transparency Platform.",
+    )
+    interconnection: InterconnectionConfig = Field(
+        default_factory=InterconnectionConfig,
+        description="Cross-border capacities, used with `electricity: cross_border_capacities: ntc`. A border in `fixed` takes precedence over `proxy`, which takes precedence over `hybrid`.",
+    )
+    renewables: RenewablesConfig = Field(
+        default_factory=RenewablesConfig,
+        description="Calibration of the renewable availability to the actual generation.",
+    )
+    dispatch: DispatchConfig = Field(
+        default_factory=DispatchConfig,
+        description="Availability, energy and fuel price per generator carrier, and the heat-led CHP minimum output.",
+    )
 
     @model_validator(mode="after")
     def check_wind_target_areas(self) -> "BackcastConfig":
         """Require wind targets only for areas without published generation."""
         published = sorted(
-            set(self.wind_target_twh) - set(self.exclude_generation_areas)
+            set(self.renewables.wind.target_twh)
+            - set(self.market_data.generation.exclude_areas)
         )
         assert not published, (
-            f"backcast: wind_target_twh given for areas not in exclude_generation_areas: {published}"
-        )
-        return self
-
-    @model_validator(mode="after")
-    def check_unavailability_carriers(self) -> "BackcastConfig":
-        """Require a monthly fallback for nuclear and no carrier calibrated twice."""
-        unavailability = self.unavailability
-        if not unavailability.enable:
-            return self
-        assert (
-            "nuclear" not in unavailability.carriers
-            or self.monthly_nuclear_availability
-        ), (
-            "backcast: unavailability of nuclear requires monthly_nuclear_availability "
-            "as fallback for areas below min_coverage."
-        )
-        overlap = sorted(
-            set(unavailability.carriers) & set(self.monthly_availability_carriers)
-        )
-        assert not overlap, (
-            f"backcast: carriers in both unavailability and monthly_availability_carriers: {overlap}"
-        )
-        return self
-
-    @model_validator(mode="after")
-    def check_solar_unpublished(self) -> "BackcastConfig":
-        """Require `calibrate_solar` for the unpublished solar generation."""
-        assert self.calibrate_solar or not self.solar_unpublished, (
-            "backcast: solar_unpublished requires calibrate_solar."
-        )
-        return self
-
-    @model_validator(mode="after")
-    def check_energy_budget_carriers(self) -> "BackcastConfig":
-        """Require no carrier with both monthly availability and energy budget, Eurostat and fixed budgets only for budget carriers and fixed budgets without the monthly ceiling."""
-        overlap = sorted(
-            set(self.energy_budget_carriers) & set(self.monthly_availability_carriers)
-        )
-        assert not overlap, (
-            f"backcast: carriers in both energy_budget_carriers and monthly_availability_carriers: {overlap}"
-        )
-        unbudgeted = sorted(
-            set(self.energy_budget_eurostat) - set(self.energy_budget_carriers)
-        )
-        assert not unbudgeted, (
-            f"backcast: carriers in energy_budget_eurostat but not in energy_budget_carriers: {unbudgeted}"
-        )
-        unbudgeted = sorted(
-            set(self.energy_budget_fixed) - set(self.energy_budget_carriers)
-        )
-        assert not unbudgeted, (
-            f"backcast: carriers in energy_budget_fixed but not in energy_budget_carriers: {unbudgeted}"
+            f"backcast: renewables: wind: target_twh given for areas not in market_data: generation: exclude_areas: {published}"
         )
         return self

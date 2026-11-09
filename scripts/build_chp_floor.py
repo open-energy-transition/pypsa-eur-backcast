@@ -18,7 +18,7 @@ daily heat demand profile: heating degree days below ``heat_threshold`` from the
 cutout temperature, weighted by the urban population of each country, plus a flat
 ``hot_water_share`` of the annual heat. The output holds the floor in MW with
 country and fuel columns. It is used by ``compose_network`` with
-``backcast: chp_floor``.
+``backcast: dispatch: chp_floor``.
 """
 
 import logging

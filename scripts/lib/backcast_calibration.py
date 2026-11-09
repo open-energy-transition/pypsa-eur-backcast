@@ -90,8 +90,8 @@ def scale_availability(
     lower, upper = factor_bounds
     assert lower <= factor <= upper, (
         f"{kind.capitalize()} calibration factor {factor:.2f} of {label} is outside "
-        f"the bounds [{lower}, {upper}]. Add {label} to backcast: "
-        f"{kind}_calibration_exclude or widen backcast: {kind}_calibration_factor_bounds."
+        f"the bounds [{lower}, {upper}]. Add {label} to backcast: renewables: "
+        f"{kind}: exclude or widen backcast: renewables: {kind}: factor_bounds."
         f"{detail}"
     )
     p_max_pu = n.generators_t.p_max_pu
@@ -485,7 +485,7 @@ def apply_monthly_availability(
         missing = required.difference(power[area].dropna().index)
         assert missing.empty, (
             f"No actual {carrier} generation for {area} in {missing.strftime('%Y-%m').tolist()} "
-            "before its phase-out. Set its last operating date in backcast: nuclear_phase_out."
+            "before its phase-out. Set its last operating date in backcast: dispatch: nuclear: phase_out."
         )
     target = power.div(capacity).reindex(months).set_axis(n.snapshots)
     target = target.where(operating, 0.0)

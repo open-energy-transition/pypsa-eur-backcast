@@ -307,7 +307,7 @@ class DataConfig(BaseModel):
     )
     eurostat_chp_production: _DataSourceConfig = Field(
         default_factory=lambda: _DataSourceConfig(source="primary"),
-        description="Eurostat gross production of electricity and heat by plant type and fuel (nrg_bal_peh) data source configuration, used for the heat-led CHP floor `backcast: chp_floor`.",
+        description="Eurostat gross production of electricity and heat by plant type and fuel (nrg_bal_peh) data source configuration, used for the heat-led CHP floor `backcast: dispatch: chp_floor`.",
     )
     neso_electricity_demand: _DataSourceConfig = Field(
         default_factory=lambda: _DataSourceConfig(source="archive"),

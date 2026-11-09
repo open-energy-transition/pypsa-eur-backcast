@@ -14,17 +14,20 @@ from entsoe.mappings import Area
 from snakemake.utils import update_config
 
 from scripts.lib.backcast_calibration import read_solar_unpublished
+from scripts.lib.backcast_dispatch import dispatch_carriers
 from scripts.lib.entsoe import read_area_to_bus
 from scripts.lib.validation.config import validate_config, validate_scenarios
 
 ROOT = Path(__file__).parent.parent
 BASE = yaml.safe_load((ROOT / "config/backcast/config.backcast.yaml").read_text())
 SCENARIOS = yaml.safe_load((ROOT / BASE["run"]["scenarios"]["file"]).read_text())
+DEFAULTS = yaml.safe_load((ROOT / "config/config.default.yaml").read_text())
 
 
-def resolve(name: str, base: dict = BASE) -> dict:
-    """Return `base` updated by the overrides of scenario `name`."""
-    config = copy.deepcopy(base)
+def resolve(name: str) -> dict:
+    """Return the defaults updated by the base config and the overrides of scenario `name`."""
+    config = copy.deepcopy(DEFAULTS)
+    update_config(config, BASE)
     update_config(config, SCENARIOS[name])
     return config
 
@@ -42,7 +45,7 @@ def test_scenarios_found():
 
 def test_scenarios_compatible():
     """Each scenario resolves to a valid config without changing the planning horizon, as checked by the workflow."""
-    defaults = yaml.safe_load((ROOT / "config/config.default.yaml").read_text())
+    defaults = copy.deepcopy(DEFAULTS)
     update_config(defaults, BASE)
     validate_scenarios(defaults, SCENARIOS)
 
@@ -55,7 +58,11 @@ def test_validates(scenario):
 def test_year_settings_consistent(scenario):
     _, year, config = scenario
     electricity = config["electricity"]
-    assert config["snapshots"] == {"start": f"{year}-01-01", "end": f"{year + 1}-01-01"}
+    snapshots = config["snapshots"]
+    assert (snapshots["start"], snapshots["end"]) == (
+        f"{year}-01-01",
+        f"{year + 1}-01-01",
+    )
     assert config["atlite"]["default_cutout"] == f"europe-{year}-sarah3-era5"
     assert electricity["estimate_renewable_capacities"]["year"] == year
     assert config["conventional"]["estimate_efficiencies"]["reference_year"] == year
@@ -67,31 +74,34 @@ def test_year_settings_consistent(scenario):
 def test_areas_known(scenario):
     _, _, config = scenario
     backcast = config["backcast"]
-    area_to_bus = read_area_to_bus(
-        ROOT / backcast.get("area_to_bus", "data/entsoe_area_to_bus.csv")
-    )
-    borders = pd.read_csv(ROOT / backcast.get("borders", "data/entsoe_borders.csv"))
+    area_to_bus = read_area_to_bus(ROOT / backcast["areas"]["area_to_bus"])
+    borders = pd.read_csv(ROOT / backcast["areas"]["borders"])
     known = set(area_to_bus)
     assert known <= set(Area.__members__), "Areas unknown to entsoe-py"
     assert set(borders.area0) | set(borders.area1) <= known
 
-    fixed = [
-        a
-        for border in backcast.get("fixed_border_capacities", {})
-        for a in border.split("-")
-    ]
+    market_data = backcast["market_data"]
+    wind = backcast["renewables"]["wind"]
+    dispatch = backcast["dispatch"]
     configured = {
-        "exclude_price_areas": backcast.get("exclude_price_areas", []),
-        "exclude_generation_areas": backcast.get("exclude_generation_areas", []),
-        "fixed_border_capacities": fixed,
-        "wind_calibration_exclude": backcast.get("wind_calibration_exclude", {}),
-        "wind_target_twh": backcast.get("wind_target_twh", {}),
-        "wind_curtailment_twh": backcast.get("wind_curtailment_twh", {}),
-        "nuclear_phase_out": backcast.get("nuclear_phase_out", {}),
-        "monthly_availability_exclude": [
+        "market_data: prices: exclude_areas": market_data["prices"]["exclude_areas"],
+        "market_data: generation: exclude_areas": market_data["generation"][
+            "exclude_areas"
+        ],
+        "interconnection: fixed": [
             a
-            for areas in backcast.get("monthly_availability_exclude", {}).values()
-            for a in areas
+            for border in backcast["interconnection"]["fixed"]
+            for a in border.split("-")
+        ],
+        "renewables: wind: exclude": wind["exclude"],
+        "renewables: wind: target_twh": wind["target_twh"],
+        "renewables: wind: curtailment_twh": wind["curtailment_twh"],
+        "dispatch: nuclear: phase_out": dispatch["nuclear"]["phase_out"],
+        "dispatch: exclude_areas": [
+            a
+            for carrier, block in dispatch.items()
+            if carrier != "chp_floor"
+            for a in block["exclude_areas"]
         ],
     }
     for key, areas in configured.items():
@@ -103,12 +113,10 @@ def test_areas_known(scenario):
 
 def test_external_borders_known(scenario):
     _, _, config = scenario
-    defaults = yaml.safe_load((ROOT / "config/config.default.yaml").read_text())
-    update_config(defaults, config)
-    area_to_bus = read_area_to_bus(ROOT / defaults["backcast"]["area_to_bus"])
-    modelled = set(area_to_bus[area_to_bus.index.str[:2].isin(defaults["countries"])])
+    area_to_bus = read_area_to_bus(ROOT / config["backcast"]["areas"]["area_to_bus"])
+    modelled = set(area_to_bus[area_to_bus.index.str[:2].isin(config["countries"])])
     borders = pd.read_csv(ROOT / "data/entsoe_external_borders.csv")
-    external = set(defaults["backcast"]["external_flows"]["areas"])
+    external = set(config["backcast"]["areas"]["external"]["areas"])
     assert set(borders.area) <= modelled
     assert external <= set(borders.external_area) <= set(Area.__members__)
     assert not external & modelled
@@ -119,18 +127,16 @@ def test_external_borders_known(scenario):
     [
         ("renewable.hydro.flatten_dispatch", False),
         ("renewable.hydro.inflow_source", "eia"),
-        ("backcast.calibrate_wind", False),
-        ("backcast.calibrate_solar", False),
-        ("backcast.monthly_nuclear_availability", False),
-        ("backcast.nuclear_min_output", False),
-        ("backcast.energy_budget_carriers", []),
-        ("backcast.energy_budget_eurostat", []),
-        ("backcast.energy_budget_fixed", []),
-        ("backcast.chp_floor.enable", False),
-        ("backcast.hybrid_capacities.enable", False),
-        ("backcast.external_flows.enable", False),
-        ("backcast.solar_unpublished", False),
-        ("backcast.fuel_price", {"nuclear": 7.4536}),
+        ("backcast.renewables.wind.calibrate", False),
+        ("backcast.renewables.solar.calibrate", False),
+        ("backcast.renewables.solar.unpublished", False),
+        ("backcast.dispatch.nuclear.availability", "none"),
+        ("backcast.dispatch.nuclear.min_output", "none"),
+        ("backcast.dispatch.nuclear.fuel_price", 7.4536),
+        ("backcast.dispatch.biomass.energy", "none"),
+        ("backcast.dispatch.chp_floor.enable", False),
+        ("backcast.interconnection.hybrid.enable", False),
+        ("backcast.areas.external.enable", False),
     ],
 )
 def test_plain_scenario_unrefined(path, off):
@@ -140,19 +146,22 @@ def test_plain_scenario_unrefined(path, off):
     assert config == off
 
 
+def test_plain_scenario_without_dispatch_refinements():
+    dispatch = dispatch_carriers(resolve("backcast-2019-plain")["backcast"]["dispatch"])
+    assert not (dispatch.uses_monthly_generation or dispatch.uses_hourly_generation)
+    assert not dispatch.outages
+
+
 def test_solar_unpublished_calibrated(scenario):
     _, year, config = scenario
     backcast = config["backcast"]
-    if not backcast.get("solar_unpublished", False):
+    if not backcast["renewables"]["solar"]["unpublished"]:
         return
     areas = set(read_solar_unpublished(ROOT / "data/solar_unpublished.csv", year).index)
-    assert areas <= set(
-        read_area_to_bus(
-            ROOT / backcast.get("area_to_bus", "data/entsoe_area_to_bus.csv")
-        )
-    )
+    assert areas <= set(read_area_to_bus(ROOT / backcast["areas"]["area_to_bus"]))
     excluded = (
-        backcast["solar_calibration_exclude"] + backcast["exclude_generation_areas"]
+        backcast["renewables"]["solar"]["exclude"]
+        + backcast["market_data"]["generation"]["exclude_areas"]
     )
     assert not areas & set(excluded)
 

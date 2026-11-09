@@ -100,83 +100,101 @@ solving:
     noisy_costs: false
 
 backcast:
-  chp_floor:
-    enable: true
-  # Fixed hourly exchanges with areas outside the model from the ENTSO-E Transparency Platform total scheduled
-  # commercial exchanges (12.1.F) and physical flows (12.1.G) for FI-RU, borders and sources in data/entsoe_external_borders.csv (plan item 1.6, #12).
-  external_flows:
-    enable: true
-  exclude_price_buses: [FR15]
-  max_price_gap_hours_by_area:
-    IE_SEM: 25
-  fixed_border_capacities:
-    FI-SE_2: 0
-    FR-IT_CNOR: physical
-    FR-IT_SARD: physical
-  exchange_proxy_borders: [BE-NL, DE_LU-NL]
-  calibrate_wind: true
-  wind_calibration_exclude:
-    BA: [onwind]
-    CH: [onwind]
-    ES: [offwind]
-    FR: [offwind]
-    HR: [onwind]
-    IT_CNOR: [onwind]
-    IT_CSUD: [onwind]
-    IT_NORD: [onwind]
-    IT_SICI: [onwind]
-    IT_SUD: [onwind, offwind]
-    ME: [onwind]
-    MK: [onwind]
-    NL: [onwind]
-    NO_2: [onwind]
-    NO_3: [onwind]
-    NO_5: [onwind]
-    SI: [onwind]
-    XK: [onwind]
-  # Solar availability scaled to ENTSO-E actual solar generation (16.1.B/C), which is grid-fed like ENTSO-E load.
-  # Excluded areas keep the atlite profile minus the cited self-consumed share in data/solar_self_consumption.csv.
-  # Each share applies to every backcast year (reference_year is documentation only); for AT before 2023 it is likely too high, as the feed-in-tariff fleet was a larger fraction.
-  # Factors are ENTSO-E solar over model available solar of the backcast composed networks 2019/2020/2023/2024; 2021, 2022 and 2025 are not checked yet.
-  # With solar_unpublished, calibrated areas in data/solar_unpublished.csv add grid-fed PV that ENTSO-E does not publish to their
-  # target (plan item 1.4, dev/backcast-accuracy/p1-retune/solar/diagnosis.md option 1, unpublished.py): per country
-  # max(0, min(Eurostat PV - ENTSO-E solar, load - generation - net scheduled imports - biomass budget uplift)), split over
-  # its areas by ENTSO-E solar, DE_LU counting DE and LU. The biomass budget raised to Eurostat (energy_budget_eurostat)
-  # claims the balance gap first, as far as the biomass capacity can produce it; solar gets only the remainder. SE is left
-  # out (ENTSO-E publishes no SE biomass or CHP, its gap is unpublished thermal output), NO too (only NO_1 publishes solar,
-  # 2 GWh from 2024-05).
-  calibrate_solar: true
-  solar_calibration_factor_bounds: [0.35, 2.0]
-  solar_calibration_exclude:
-  - AT  # 0.34/0.33/0.32/0.59, ENTSO-E misses most rooftop PV
-  - BA  # 0.22 in 2023
-  - CH  # 0.14 in 2019, ENTSO-E covers a fraction of the fleet (PR #24 balance)
-  - GR  # ENTSO-E solar incomplete (PR #24 balance)
-  - HR  # 0.20 in 2023
-  - IE_SEM  # no solar before 2024, 0 in 2024 from 1464 h
-  - LV  # 0 in 2023 from 744 h
-  - ME  # 0 in 2023
-  - MK  # ENTSO-E solar incomplete (PR #24 balance)
-  - NL  # 0.01-0.03, ENTSO-E misses rooftop PV (PR #24 balance)
-  - SE_1  # 0.01
-  - SE_2  # 0.18
-  - SI  # 0.26 in 2023
-  monthly_nuclear_availability: true
-  # Nuclear minimum output per area and month from the lowest hourly ENTSO-E nuclear generation (plan item 1.2).
-  nuclear_min_output: true
-  nuclear_load_following:
-    # EDF units vary between 20 % and 100 % of rated power within 30 minutes, twice a day
-    # (Morilhat et al. 2019, Nuclear Power Plant flexibility at EDF, HAL hal-01977209).
-    FR: 0.2
-  fuel_price:
-    # WNA, Economics of Nuclear Power (prices of September 2021): front-end fuel cost USD 1663 per kg U as UO2 fuel at a burn-up of
-    # 45,000 MWd per tonne U = 1080 MWh_th/kg U, i.e. 1.540 USD/MWh_th (0.46 US cents/kWh_e at 360,000 kWh_e/kg); divided by the ECB
-    # EUR/USD reference rate of September 2021, 1.1770, this is 1.31 EUR/MWh_th. Back-end costs (WNA: up to 10 % of the
-    # cost per kWh) are left out. Replaces the technology data value of 7.45 EUR/MWh_th.
-    nuclear: 1.31
-  hybrid_capacities:
-    enable: true
-    physical_factor: 0.49
-    dc_physical_factor: 0.7
-    sources: [scheduled_exchange]
-    areas: [AT, BE, CZ, DE_LU, FR, HR, HU, NL, PL, RO, SI, SK]
+  areas:
+    # Fixed hourly exchanges with areas outside the model from the ENTSO-E Transparency Platform total scheduled
+    # commercial exchanges (12.1.F) and physical flows (12.1.G) for FI-RU, borders and sources in data/entsoe_external_borders.csv (plan item 1.6, #12).
+    external:
+      enable: true
+  market_data:
+    prices:
+      exclude_buses: [FR15]
+      max_gap_hours_by_area:
+        IE_SEM: 25
+  interconnection:
+    fixed:
+      FI-SE_2: 0
+      FR-IT_CNOR: physical
+      FR-IT_SARD: physical
+    proxy:
+      borders: [BE-NL, DE_LU-NL]
+    hybrid:
+      enable: true
+      physical_factor: 0.49
+      dc_physical_factor: 0.7
+      sources: [scheduled_exchange]
+      areas: [AT, BE, CZ, DE_LU, FR, HR, HU, NL, PL, RO, SI, SK]
+  renewables:
+    wind:
+      calibrate: true
+      exclude:
+        BA: [onwind]
+        CH: [onwind]
+        ES: [offwind]
+        FR: [offwind]
+        HR: [onwind]
+        IT_CNOR: [onwind]
+        IT_CSUD: [onwind]
+        IT_NORD: [onwind]
+        IT_SICI: [onwind]
+        IT_SUD: [onwind, offwind]
+        ME: [onwind]
+        MK: [onwind]
+        NL: [onwind]
+        NO_2: [onwind]
+        NO_3: [onwind]
+        NO_5: [onwind]
+        SI: [onwind]
+        XK: [onwind]
+    # Solar availability scaled to ENTSO-E actual solar generation (16.1.B/C), which is grid-fed like ENTSO-E load.
+    # Excluded areas keep the atlite profile minus the cited self-consumed share in data/solar_self_consumption.csv.
+    # Each share applies to every backcast year (reference_year is documentation only); for AT before 2023 it is likely too high, as the feed-in-tariff fleet was a larger fraction.
+    # Factors are ENTSO-E solar over model available solar of the backcast composed networks 2019/2020/2023/2024; 2021, 2022 and 2025 are not checked yet.
+    # With unpublished, calibrated areas in data/solar_unpublished.csv add grid-fed PV that ENTSO-E does not publish to their
+    # target (plan item 1.4, dev/backcast-accuracy/p1-retune/solar/diagnosis.md option 1, unpublished.py): per country
+    # max(0, min(Eurostat PV - ENTSO-E solar, load - generation - net scheduled imports - biomass budget uplift)), split over
+    # its areas by ENTSO-E solar, DE_LU counting DE and LU. The biomass budget raised to Eurostat (dispatch: biomass: energy)
+    # claims the balance gap first, as far as the biomass capacity can produce it; solar gets only the remainder. SE is left
+    # out (ENTSO-E publishes no SE biomass or CHP, its gap is unpublished thermal output), NO too (only NO_1 publishes solar,
+    # 2 GWh from 2024-05).
+    solar:
+      calibrate: true
+      factor_bounds: [0.35, 2.0]
+      exclude:
+      - AT  # 0.34/0.33/0.32/0.59, ENTSO-E misses most rooftop PV
+      - BA  # 0.22 in 2023
+      - CH  # 0.14 in 2019, ENTSO-E covers a fraction of the fleet (PR #24 balance)
+      - GR  # ENTSO-E solar incomplete (PR #24 balance)
+      - HR  # 0.20 in 2023
+      - IE_SEM  # no solar before 2024, 0 in 2024 from 1464 h
+      - LV  # 0 in 2023 from 744 h
+      - ME  # 0 in 2023
+      - MK  # ENTSO-E solar incomplete (PR #24 balance)
+      - NL  # 0.01-0.03, ENTSO-E misses rooftop PV (PR #24 balance)
+      - SE_1  # 0.01
+      - SE_2  # 0.18
+      - SI  # 0.26 in 2023
+      unpublished: true  # grid-fed PV missing from ENTSO-E in data/solar_unpublished.csv, computed with the biomass budget raised to Eurostat (plan item 1.4)
+  dispatch:
+    nuclear:
+      availability: monthly
+      # Nuclear minimum output per area and month from the lowest hourly ENTSO-E nuclear generation (plan item 1.2).
+      min_output: monthly_min
+      load_following:
+        # EDF units vary between 20 % and 100 % of rated power within 30 minutes, twice a day
+        # (Morilhat et al. 2019, Nuclear Power Plant flexibility at EDF, HAL hal-01977209).
+        FR: 0.2
+      # WNA, Economics of Nuclear Power (prices of September 2021): front-end fuel cost USD 1663 per kg U as UO2 fuel at a burn-up of
+      # 45,000 MWd per tonne U = 1080 MWh_th/kg U, i.e. 1.540 USD/MWh_th (0.46 US cents/kWh_e at 360,000 kWh_e/kg); divided by the ECB
+      # EUR/USD reference rate of September 2021, 1.1770, this is 1.31 EUR/MWh_th. Back-end costs (WNA: up to 10 % of the
+      # cost per kWh) are left out. Replaces the technology data value of 7.45 EUR/MWh_th.
+      fuel_price: 1.31
+    biomass:
+      # Biomass budget per ENTSO-E area (plan item 1.3), raised to Eurostat nrg_bal_peh gross biomass electricity (BIOE - W6210)
+      # where it exceeds ENTSO-E, as ENTSO-E misses autoproducer and small CHP biomass (dev/backcast-accuracy/p1-retune/biomass/diagnosis.md
+      # option A), and fixed to the hourly ENTSO-E profile scaled to the raised budget, as heat-led CHP takes the price; the binding
+      # annual cap made biomass the price setter at its shadow price (FI 2023 +39 EUR/MWh), dev/backcast-accuracy/p1-gate.md
+      # "2023 leave-one-out of the P1 re-tune".
+      energy: fixed
+      monthly_ceiling: false  # no effect, the fixed output is not clipped
+    chp_floor:
+      enable: true

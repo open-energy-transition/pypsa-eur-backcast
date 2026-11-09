@@ -464,33 +464,45 @@ Configuration for `load` settings.
 Configuration for the backcast of historical day-ahead electricity prices.
 Observed prices are retrieved from the ENTSO-E Transparency Platform per
 bidding zone and mapped to the buses of the bidding zone clustered network with
-`data/entsoe_area_to_bus.csv`. With `electricity: cross_border_capacities: ntc`,
-the transmission capacities between bidding zones are retrieved from the
-ENTSO-E Transparency Platform for the borders listed in
-`data/entsoe_borders.csv`, except for the borders given in
-`fixed_border_capacities`. The file lists the bidding zone borders with lines
-or DC links in the bidding zone clustered network. With `calibrate_wind` or
-`monthly_nuclear_availability`, the actual generation per production type of
-all modelled bidding zones in `data/entsoe_area_to_bus.csv` is retrieved from
-the ENTSO-E Transparency Platform ([build_entsoe_generation][]) and calibrates
-the wind and nuclear availability in [compose_network][]. Bidding zones without
-published generation, e.g. `GB` after 2020, must be listed in
-`exclude_generation_areas` and keep their availability, unless their wind
-energy is given in `wind_target_twh`, e.g. `GB: {onwind: 32.5, offwind: 49.6}`.
-Wind carriers with capacity but without actual generation in a bidding zone
-that publishes generation, e.g. offshore wind in `IE_SEM`, get zero
-availability. Wind calibration factors outside
-`wind_calibration_factor_bounds` raise an error, implausible carriers of an
-area are skipped via `wind_calibration_exclude`, e.g. `NL: [onwind]`. With
-`hybrid_capacities`, cross-border capacities from proxy sources are raised to a
-share of the physical transmission capacity in [compose_network][]. With
-`unavailability: enable`, the planned and forced outages of generation and
-production units of all modelled bidding zones are retrieved from the ENTSO-E
-Transparency Platform and matched to the power plants ([build_unavailability][]).
-The availability of the fossil generators of each bus and carrier is then one
-minus the unavailable share of their capacity. With `nuclear` added to
-`carriers`, it also replaces the monthly nuclear availability where at least
-`min_coverage` of the nuclear capacity of a bidding zone has outage data. The
+`data/entsoe_area_to_bus.csv` (`areas: area_to_bus`). With
+`electricity: cross_border_capacities: ntc`, the transmission capacities
+between bidding zones are retrieved from the ENTSO-E Transparency Platform for
+the borders listed in `data/entsoe_borders.csv` (`areas: borders`), except for
+the borders given in `interconnection: fixed`. The file lists the bidding zone
+borders with lines or DC links in the bidding zone clustered network. Borders
+in `interconnection: proxy` take the scheduled exchanges as capacity proxy.
+With `renewables: wind: calibrate` or a `dispatch` carrier with `availability:
+monthly`, the actual generation per production type of all modelled bidding
+zones in `data/entsoe_area_to_bus.csv` is retrieved from the ENTSO-E
+Transparency Platform ([build_entsoe_generation][]) and calibrates the wind
+and conventional availability in [compose_network][]. Bidding zones without
+published generation, e.g. `GB` after 2020, must be listed in `market_data:
+generation: exclude_areas` and keep their availability, unless their wind
+energy is given in `renewables: wind: target_twh`, e.g. `GB: {onwind: 32.5,
+offwind: 49.6}`. Wind carriers with capacity but without actual generation in
+a bidding zone that publishes generation, e.g. offshore wind in `IE_SEM`, get
+zero availability. Wind calibration factors outside `renewables: wind:
+factor_bounds` raise an error, implausible carriers of an area are skipped via
+`renewables: wind: exclude`, e.g. `NL: [onwind]`. With `interconnection:
+hybrid`, cross-border capacities from proxy sources are raised to a share of
+the physical transmission capacity in [compose_network][]. The precedence is
+`fixed` over `proxy` over `hybrid`.
+
+`dispatch` holds one block per conventional carrier (`nuclear`, `CCGT`,
+`OCGT`, `coal`, `lignite`, `oil`, `biomass`, `waste`) and the CHP floor
+(`chp_floor`). `availability: monthly` sets the monthly ENTSO-E capacity
+factor as availability. With `availability: outages`, the planned and forced
+outages of generation and production units of all modelled bidding zones are
+retrieved from the ENTSO-E Transparency Platform and matched to the power
+plants ([build_unavailability][]). The availability of the generators of each
+bus and carrier is then one minus the unavailable share of their capacity,
+where at least `outage_min_coverage` of the capacity of a bidding zone has
+outage data; nuclear falls back to its monthly availability elsewhere.
+`energy` limits the carrier to its observed energy (`budget`), scaled to
+Eurostat (`eurostat_budget`) or fixed to the observed hourly profile scaled to
+Eurostat (`fixed`); it requires an `availability` other than `monthly`.
+`exclude_areas` keeps the availability and energy of the given bidding zones,
+and `fuel_price` overrides the fuel cost of the carrier in EUR/MWh_th. The
 rule
 [evaluate_price_backcast][] compares the modelled with the observed prices.
 

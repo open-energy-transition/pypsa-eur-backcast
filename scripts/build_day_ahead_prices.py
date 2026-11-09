@@ -12,11 +12,11 @@ reference rate of their UTC day, or the last published rate on days without one
 (weekends and TARGET holidays). BGN is converted at its fixed peg of 1.95583 per
 EUR, which the ECB publishes rounded to 1.9558. Gaps of up to
 ``MAX_INTERPOLATE_PRICE_GAP_HOURS`` are interpolated, gaps up to
-``backcast: max_price_gap_hours`` (or the area specific value in
-``backcast: max_price_gap_hours_by_area``) are kept as missing values and longer
+``backcast: market_data: prices: max_gap_hours`` (or the area specific value in
+``backcast: market_data: prices: max_gap_hours_by_area``) are kept as missing values and longer
 gaps raise an error. The bidding zones are mapped to the
-buses with ``backcast: area_to_bus``, where several buses may share one
-bidding zone. Buses of areas listed in ``backcast: exclude_price_areas`` are
+buses with ``backcast: areas: area_to_bus``, where several buses may share one
+bidding zone. Buses of areas listed in ``backcast: market_data: prices: exclude_areas`` are
 omitted.
 """
 

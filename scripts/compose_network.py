@@ -48,6 +48,7 @@ from scripts.lib.backcast_calibration import (
     read_generation,
     read_solar_unpublished,
 )
+from scripts.lib.backcast_dispatch import dispatch_carriers
 from scripts.lib.conventional import (
     apply_chp_floor,
     apply_energy_budget,
@@ -95,19 +96,21 @@ def apply_backcast(
 ) -> None:
     """Apply the ENTSO-E cross-border capacities and the backcast calibration."""
     ntc = electricity["cross_border_capacities"] == "ntc"
-    wind = backcast["calibrate_wind"]
-    solar = backcast["calibrate_solar"]
-    nuclear = backcast["monthly_nuclear_availability"]
-    carriers = backcast["monthly_availability_carriers"]
-    unavailability = backcast["unavailability"]
-    if not (ntc or wind or solar or nuclear or carriers or unavailability["enable"]):
+    wind = backcast["renewables"]["wind"]
+    solar = backcast["renewables"]["solar"]
+    nuclear = backcast["dispatch"]["nuclear"]
+    dispatch = dispatch_carriers(backcast["dispatch"])
+    monthly = dispatch.uses_monthly_generation
+    if not (
+        ntc or wind["calibrate"] or solar["calibrate"] or monthly or dispatch.outages
+    ):
         return
     assert area_to_bus is not None
     if ntc:
         capacities = pd.read_csv(
             inputs.cross_border_capacities, index_col=0, parse_dates=True
         )
-        hybrid = backcast["hybrid_capacities"]
+        hybrid = backcast["interconnection"]["hybrid"]
         if hybrid["enable"]:
             capacities = raise_to_physical(
                 n,
@@ -120,44 +123,45 @@ def apply_backcast(
                 hybrid["areas"],
             )
         apply_cross_border_capacities(n, capacities, area_to_bus)
-    if wind or solar or nuclear or carriers:
+    if wind["calibrate"] or solar["calibrate"] or monthly:
         generation = read_generation(inputs.entsoe_generation)
-    if wind:
+    if wind["calibrate"]:
         calibrate_wind(
             n,
             generation,
             area_to_bus,
-            backcast["wind_curtailment_twh"],
-            backcast["wind_calibration_exclude"],
-            backcast["wind_calibration_factor_bounds"],
-            backcast["wind_target_twh"],
+            wind["curtailment_twh"],
+            wind["exclude"],
+            wind["factor_bounds"],
+            wind["target_twh"],
         )
-    if solar:
+    if solar["calibrate"]:
         calibrate_solar(
             n,
             generation,
             area_to_bus,
-            backcast["solar_calibration_exclude"],
-            backcast["solar_calibration_factor_bounds"],
+            solar["exclude"],
+            solar["factor_bounds"],
             pd.read_csv(inputs.solar_self_consumption, index_col="country").share,
             (
                 read_solar_unpublished(
                     inputs.solar_unpublished, eurostat_year(n.snapshots, None)
                 )
-                if backcast["solar_unpublished"]
+                if solar["unpublished"]
                 else pd.Series(dtype=float)
             ),
         )
-    if nuclear:
+    if dispatch.nuclear_monthly:
         apply_monthly_availability(
             n,
             generation,
             area_to_bus,
             "nuclear",
-            backcast["nuclear_area_map"],
-            backcast["nuclear_phase_out"],
+            nuclear["area_map"],
+            nuclear["phase_out"],
+            exclude=dispatch.exclude["nuclear"],
         )
-    for carrier in carriers:
+    for carrier in dispatch.monthly:
         apply_monthly_availability(
             n,
             generation,
@@ -166,9 +170,9 @@ def apply_backcast(
             {},
             {},
             keep_unpublished=True,
-            exclude=backcast["monthly_availability_exclude"].get(carrier, []),
+            exclude=dispatch.exclude[carrier],
         )
-    if unavailability["enable"]:
+    if dispatch.outages:
         share = pd.read_csv(
             inputs.unavailability, index_col=0, header=[0, 1], parse_dates=True
         )
@@ -178,8 +182,8 @@ def apply_backcast(
             share,
             coverage,
             area_to_bus,
-            unavailability["min_coverage"],
-            backcast["nuclear_phase_out"],
+            dispatch.min_coverage,
+            nuclear["phase_out"],
         )
 
 
@@ -193,7 +197,7 @@ def apply_external_flows(
     """Add the hourly exchanges with the external `areas` as fixed flows at their border buses."""
     borders = pd.read_csv(inputs.external_borders)
     unknown = sorted(set(areas) - set(borders.external_area))
-    assert not unknown, f"backcast: external_flows: areas without border: {unknown}"
+    assert not unknown, f"backcast: areas: external: areas without border: {unknown}"
     modelled = set(area_to_bus[area_to_bus.index.isin(n.buses.index)])
     borders = borders[borders.external_area.isin(areas) & borders.area.isin(modelled)]
     data = read_retrieved(inputs.external_exchanges)
@@ -237,14 +241,15 @@ if __name__ == "__main__":
     n_previous = None if is_first_horizon else pypsa.Network(inputs.network_previous)
     nyears = n.snapshot_weightings.objective.sum() / 8760.0
     costs = load_costs(snakemake.input.tech_costs)
-    set_fuel_price(costs, params.backcast["fuel_price"])
+    dispatch = dispatch_carriers(params.backcast["dispatch"])
+    set_fuel_price(costs, dispatch.fuel_price)
 
     add_electricity_components(n, inputs, params, costs)
 
     area_to_bus = read_area_to_bus(inputs.area_to_bus) if inputs.area_to_bus else None
     apply_backcast(n, inputs, area_to_bus, params.electricity, params.backcast)
 
-    external_flows = params.backcast["external_flows"]
+    external_flows = params.backcast["areas"]["external"]
     if external_flows["enable"]:
         assert area_to_bus is not None
         apply_external_flows(
@@ -287,36 +292,35 @@ if __name__ == "__main__":
     maybe_adjust_costs_and_potentials(n, adjustments["electricity"], current_horizon)
     maybe_adjust_costs_and_potentials(n, adjustments["sector"], current_horizon)
 
-    chp_floor = params.backcast["chp_floor"]
+    chp_floor = params.backcast["dispatch"]["chp_floor"]
     if chp_floor["enable"]:
         floor = pd.read_csv(
             inputs.chp_floor, index_col=0, header=[0, 1], parse_dates=True
         )
         apply_chp_floor(n, floor, chp_floor["replace_p_min_pu"])
 
-    backcast = params.backcast
+    nuclear = params.backcast["dispatch"]["nuclear"]
     spread = params.conventional["marginal_cost_spread"]
     observed_spread = spread["enable"] and spread["reference"] == "observed"
-    budget_carriers = backcast["energy_budget_carriers"]
-    if observed_spread or backcast["nuclear_min_output"] or budget_carriers:
+    if observed_spread or dispatch.uses_hourly_generation:
         assert area_to_bus is not None
         generation = read_hourly_generation(inputs.entsoe_generation_hourly)
-        if backcast["nuclear_min_output"]:
+        if dispatch.nuclear_min_output:
             apply_nuclear_min_output(
                 n,
                 generation,
                 area_to_bus,
-                backcast["nuclear_area_map"],
-                backcast["nuclear_load_following"],
+                nuclear["area_map"],
+                nuclear["load_following"],
             )
-        for carrier in budget_carriers:
+        for carrier in dispatch.budget:
             reported = (
                 gross_electricity(
                     inputs.eurostat_production,
                     eurostat_year(n.snapshots, None),
                     carrier,
                 )
-                if carrier in backcast["energy_budget_eurostat"]
+                if carrier in dispatch.eurostat
                 else pd.Series(dtype=float)
             )
             apply_energy_budget(
@@ -324,10 +328,10 @@ if __name__ == "__main__":
                 generation,
                 area_to_bus,
                 carrier,
-                backcast["monthly_availability_exclude"].get(carrier, []),
-                backcast["energy_budget_monthly_ceiling"],
+                dispatch.exclude[carrier],
+                dispatch.monthly_ceiling[carrier],
                 reported,
-                carrier in backcast["energy_budget_fixed"],
+                carrier in dispatch.fixed,
             )
 
     clip_p_min_pu(n)

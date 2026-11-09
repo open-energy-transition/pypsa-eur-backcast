@@ -163,5 +163,5 @@ def test_read_solar_unpublished(tmp_path):
 
 
 def test_solar_unpublished_requires_calibration():
-    with pytest.raises(ValidationError, match="requires calibrate_solar"):
-        BackcastConfig(solar_unpublished=True)
+    with pytest.raises(ValidationError, match="unpublished requires calibrate"):
+        BackcastConfig(renewables={"solar": {"unpublished": True}})

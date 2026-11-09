@@ -22,21 +22,18 @@ def get_compose_inputs(w):
     elec = cfg["electricity"]
     sector = cfg["sector"]
     import_carriers = sector["imports"]["price"] if sector["imports"]["enable"] else {}
+    backcast = cfg["backcast"]
+    dispatch = dispatch_carriers(backcast["dispatch"])
     calibrate = (
-        cfg["backcast"]["calibrate_wind"]
-        or cfg["backcast"]["calibrate_solar"]
-        or cfg["backcast"]["monthly_nuclear_availability"]
-        or cfg["backcast"]["monthly_availability_carriers"]
+        backcast["renewables"]["wind"]["calibrate"]
+        or backcast["renewables"]["solar"]["calibrate"]
+        or dispatch.uses_monthly_generation
     )
     spread = cfg["conventional"]["marginal_cost_spread"]
     observed_spread = spread["enable"] and spread["reference"] == "observed"
-    unavailability = cfg["backcast"]["unavailability"]["enable"]
-    observed_hourly = (
-        observed_spread
-        or cfg["backcast"]["nuclear_min_output"]
-        or cfg["backcast"]["energy_budget_carriers"]
-    )
-    external_flows = cfg["backcast"]["external_flows"]["enable"]
+    unavailability = bool(dispatch.outages)
+    observed_hourly = observed_spread or dispatch.uses_hourly_generation
+    external_flows = backcast["areas"]["external"]["enable"]
     needs_area_to_bus = (
         external_flows
         or elec["cross_border_capacities"] == "ntc"
@@ -112,7 +109,7 @@ def get_compose_inputs(w):
             if elec["cross_border_capacities"] == "ntc"
             else []
         ),
-        area_to_bus=cfg["backcast"]["area_to_bus"] if needs_area_to_bus else [],
+        area_to_bus=backcast["areas"]["area_to_bus"] if needs_area_to_bus else [],
         external_borders=("data/entsoe_external_borders.csv" if external_flows else []),
         external_exchanges=input_external_exchanges(w),
         entsoe_generation_hourly=(
@@ -123,15 +120,17 @@ def get_compose_inputs(w):
         ),
         solar_self_consumption=(
             "data/solar_self_consumption.csv"
-            if cfg["backcast"]["calibrate_solar"]
+            if backcast["renewables"]["solar"]["calibrate"]
             else []
         ),
         solar_unpublished=(
-            "data/solar_unpublished.csv" if cfg["backcast"]["solar_unpublished"] else []
+            "data/solar_unpublished.csv"
+            if backcast["renewables"]["solar"]["unpublished"]
+            else []
         ),
         eurostat_production=(
             f"{EUROSTAT_CHP_DATA['folder']}/estat_nrg_bal_peh.tsv.gz"
-            if cfg["backcast"]["energy_budget_eurostat"]
+            if dispatch.eurostat
             else []
         ),
         unavailability=resources("unavailability.csv") if unavailability else [],
@@ -139,7 +138,9 @@ def get_compose_inputs(w):
             resources("unavailability_coverage.csv") if unavailability else []
         ),
         chp_floor=(
-            resources("chp_floor.csv") if cfg["backcast"]["chp_floor"]["enable"] else []
+            resources("chp_floor.csv")
+            if backcast["dispatch"]["chp_floor"]["enable"]
+            else []
         ),
         solar_rooftop_potentials=(
             resources("solar_rooftop_potentials.csv")
